@@ -65,8 +65,8 @@ def return_train_val_functions(model, optimizer,
             
             mask_indices = tf.where(mask == 1) # extract indices of masked bins
             # subset target and predictions to masked bins
-            target_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(target_atac, mask_indices), axis=0), axis=2)
-            output_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_atac, mask_indices), axis=0), axis=2)
+            target_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(target, mask_indices), axis=0), axis=2)
+            output_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_profile, mask_indices), axis=0), axis=2)
 
             # Calculate and scale loss, since it will be summed across all replicas at each step
             loss = tf.reduce_mean(loss_fn(target_atac, output_atac)) * (1.0/num_replicas)
@@ -91,8 +91,8 @@ def return_train_val_functions(model, optimizer,
 
         mask_indices = tf.where(mask == 1) # extract indices of masked bins
         # subset target and predictions to masked bins
-        target_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(target_atac, mask_indices), axis=0), axis=2)
-        output_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_atac, mask_indices), axis=0), axis=2)
+        target_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(target, mask_indices), axis=0), axis=2)
+        output_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_profile, mask_indices), axis=0), axis=2)
 
         # Calculate and scale loss, since it will be summed across all replicas at each step
         loss = tf.reduce_mean(loss_fn(target_atac, output_atac)) * (1.0/num_replicas)
