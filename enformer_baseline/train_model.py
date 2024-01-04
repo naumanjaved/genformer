@@ -84,9 +84,6 @@ def main():
                 },
                 'use_enformer_weights': {
                     'values':[parse_bool_str(x) for x in args.use_enformer_weights.split(',')]
-                },
-                'freeze_trunk': {
-                    'values':[parse_bool_str(x) for x in args.freeze_trunk.split(',')]
                 }
                 }
 
@@ -182,7 +179,7 @@ def main():
 
                 
             
-            enformer_model = enformer.Enformer(output_heads_dict = {'human': 54})
+            enformer_model = enformer.Enformer(output_heads_dict = {'human': 50})
             SEQ_LENGTH = 196608
 
             date_string = f'{datetime.now():%Y-%m-%d %H:%M:%S%z}'
@@ -210,23 +207,16 @@ def main():
             optimizer1 = tf.keras.optimizers.Adam(learning_rate=scheduler1,epsilon=wandb.config.epsilon)
             
             optimizer2 = tf.keras.optimizers.Adam(learning_rate=scheduler2,epsilon=wandb.config.epsilon)
-            if wandb.config.freeze_trunk:
-                optimizers_in = optimizer2
-            else:
-                optimizers_in = optimizer1,optimizer2
+            optimizers_in = optimizer1,optimizer2
 
             metric_dict = {}
             
 
-            train_step_full,train_step_head, val_step, val_step_TSS, build_step,metric_dict = training_utils.return_train_val_functions(enformer_model,
+            train_step,val_step, val_step_TSS,build_step,metric_dict = training_utils.return_train_val_functions(enformer_model,
                                                                                                                                         optimizers_in,
-                                                                                                                                        wandb.config.freeze_trunk,
                                                                                                                                         strategy,
                                                                                                                                         metric_dict,
-                                                                                                                                        wandb.config.train_steps,
-                                                                                                                                        wandb.config.val_steps,
-                                                                                                                                        wandb.config.val_steps_TSS,
-                                                                                                                                        GLOBAL_BATCH_SIZE,
+                                                                                                                                        NUM_REPLICAS,
                                                                                                                                         wandb.config.gradient_clip)
             
             
@@ -240,8 +230,6 @@ def main():
             best_epoch = 0
             
             for epoch_i in range(1, wandb.config.num_epochs+1):
-                print('starting epoch_', str(epoch_i))
-                start = time.time()
                 if epoch_i == 1:
                     # run once to build the model w/o updating anything
                     print('building model...')
@@ -261,11 +249,13 @@ def main():
                         total_params += tf.size(var)
                     print('total params: ' + str(total_params)) 
 
-                if wandb.config.freeze_trunk:
-                    train_step_head(tr_data_it)
-                else:
-                    train_step_full(tr_data_it)
                     
+                    
+                # main training step 
+                print('starting epoch_', str(epoch_i))
+                start = time.time()
+                for step in range(wandb.config.train_steps):
+                    strategy.run(train_step, args=(next(tr_data_it),))
                 end = time.time()
                 duration = (end - start) / 60.
                 print('completed epoch ' + str(epoch_i))
@@ -275,36 +265,43 @@ def main():
                 print('training duration(mins): ' + str(duration))
                 
                 start = time.time()
-                val_step(val_data_it)
+                for step in range(wandb.config.val_steps):
+                    strategy.run(val_step, args=(next(val_data_it),))
                 
                 print('human_val_loss: ' + str(metric_dict['hg_val'].result().numpy()))
                 val_losses.append(metric_dict['hg_val'].result().numpy())
                 wandb.log({'human_val_loss': metric_dict['hg_val'].result().numpy()},
                           step=epoch_i)
                 pearsonsR=metric_dict['pearsonsR'].result()['PearsonR'].numpy()
-                wandb.log({'human_val_tracks_pearsons': np.nanmean(pearsonsR),
-                           'human_ATAC_pearsons': np.nanmean(pearsonsR[27:]),
-                           'human_CAGE_pearsons': np.nanmean(pearsonsR[:27])},
+                wandb.log({'human_val_tracks_pearsons': np.nanmean(pearsonsR)},
                           step=epoch_i)
 
                 R2=metric_dict['R2'].result()['R2'].numpy()
                 wandb.log({'human_val_tracks_R2': np.nanmean(R2),
-                           'human_ATAC_R2': np.nanmean(R2[27:]),
-                           'human_CAGE_R2': np.nanmean(R2[:27])},
+                           'human_ATAC_R2': np.nanmean(R2)},
                           step=epoch_i)
-                print('computing TSS quant metrics')
                 
-                val_step_TSS(val_data_TSS_it)
+                print('computing TSS quant metrics')
+                pred_list = [] # list to store predictions
+                true_list = [] # list to store true values
+                gene_list = []
+                cell_list = []
+                for step in range(wandb.config.val_steps_TSS):
+                    pred, true, gene, cell= strategy.run(val_step_TSS,args = (next(val_data_TSS_it),))
+                    true, pred = strategy.run(val_step, args=(next(data_val_ho),))
+                    for x in strategy.experimental_local_results(true): # flatten the true values
+                        true_list.append(tf.reshape(x, [-1]))
+                    for x in strategy.experimental_local_results(pred): # flatten the pred values
+                        pred_list.append(tf.reshape(x, [-1]))
+                    for x in strategy.experimental_local_results(gene): # flatten the pred values
+                        gene_list.append(tf.reshape(x, [-1]))
+                    for x in strategy.experimental_local_results(cell): # flatten the pred values
+                        cell_list.append(tf.reshape(x, [-1]))
 
-                y_trues = metric_dict['hg_corr_stats'].result()['y_trues'].numpy()
-                y_preds = metric_dict['hg_corr_stats'].result()['y_preds'].numpy()
-                cell_types = metric_dict['hg_corr_stats'].result()['cell_types'].numpy()
-                gene_map = metric_dict['hg_corr_stats'].result()['gene_map'].numpy()
-
-                figures,corrs_overall= training_utils.make_plots(y_trues,
-                                                                 y_preds,
-                                                                 cell_types,
-                                                                 gene_map)
+                figures,corrs_overall= training_utils.make_plots(tf.concat(true_list,0),
+                                                                 tf.concat(pred_list,0),
+                                                                 tf.concat(cell_list,0),
+                                                                 tf.concat(gene_list,0))
 
                 print('returned TSS centered correlations and figures')
                 fig_cell_spec, fig_gene_spec, fig_overall=figures 
@@ -313,7 +310,6 @@ def main():
                     gene_spec_mean_corrs, \
                         cell_spec_mean_corrs_raw, \
                             gene_spec_mean_corrs_raw = corrs_overall
-                
                 
                 val_pearsons.append(cell_spec_mean_corrs)
                 
@@ -332,7 +328,6 @@ def main():
                 except IndexError:
                     pass
                 
-
                 end = time.time()
                 duration = (end - start) / 60.
                 print('completed epoch ' + str(epoch_i) + ' validation')

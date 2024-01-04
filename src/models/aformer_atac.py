@@ -111,7 +111,7 @@ class genformer(tf.keras.Model):
         self.stem_res_conv=Residual(conv_block(int(self.filter_list_seq[0]), 1, 
                                                     BN_momentum=self.BN_momentum,
                                                     name='pointwise_conv_block'))
-        self.stem_pool = tf.keras.layers.MaxPool1D(pool_size=2)
+        self.stem_pool = tf.keras.layers.MaxPooling1D(pool_size=2)
 
         # convolutional stem for ATAC profile
         self.stem_conv_atac = tf.keras.layers.Conv1D(
@@ -125,7 +125,7 @@ class genformer(tf.keras.Model):
         self.stem_res_conv_atac =Residual(conv_block(32, 1, 
                                                     BN_momentum=self.BN_momentum,
                                                     name='pointwise_conv_block_atac'))
-        self.stem_pool_atac = tf.keras.layers.MaxPool1D(pool_size=2)
+        self.stem_pool_atac = tf.keras.layers.MaxPooling1D(pool_size=2)
 
         # convolutional tower for sequence input
         self.conv_tower = tf.keras.Sequential([
@@ -135,7 +135,7 @@ class genformer(tf.keras.Model):
                                stride=1,
                                BN_momentum=self.BN_momentum,
                                padding='same'),
-                tf.keras.layers.MaxPool1D(pool_size=2)],
+                tf.keras.layers.MaxPooling1D(pool_size=2)],
                        name=f'conv_tower_block_{i}')
             for i, num_filters in enumerate(self.filter_list_seq)], name='conv_tower')
 
@@ -148,7 +148,7 @@ class genformer(tf.keras.Model):
                                stride=1,
                                BN_momentum=self.BN_momentum,
                                padding='same'),
-                tf.keras.layers.MaxPool1D(pool_size=4)],
+                tf.keras.layers.MaxPooling1D(pool_size=4)],
                        name=f'conv_tower_block_atac_{i}')
             for i, num_filters in enumerate(self.filter_list_atac)], name='conv_tower_atac')
 
@@ -217,10 +217,10 @@ class genformer(tf.keras.Model):
         sequence,atac,motif_activity = inputs
 
         # sequence input processing
-        x = self.stem_conv(sequence, training=training)
-        x = self.stem_res_conv(x, training=training)
-        x = self.stem_pool(x, training=training)
-        x = self.conv_tower(x, training=training)
+        sequence = self.stem_conv(sequence, training=training)
+        sequence = self.stem_res_conv(sequence, training=training)
+        sequence = self.stem_pool(sequence, training=training)
+        sequence = self.conv_tower(sequence, training=training)
 
         # atac input processsing
         atac_x = self.stem_conv_atac(atac, training=training)
@@ -234,7 +234,7 @@ class genformer(tf.keras.Model):
         motif_activity = self.motif_activity_fc2(motif_activity)
         motif_activity = tf.tile(motif_activity, [1, self.output_length, 1])
 
-        transformer_input = tf.concat([x,atac_x, motif_activity], axis=2) # append processed seq,atac,motif inputs in channel dim.
+        transformer_input = tf.concat([sequence,atac_x, motif_activity], axis=2) # append processed seq,atac,motif inputs in channel dim.
         out_performer,att_matrices = self.performer(transformer_input, training=training)
         out = self.crop_final(out_performer)
         out = self.final_pointwise_conv(out, training=training)
@@ -287,10 +287,10 @@ class genformer(tf.keras.Model):
         sequence,atac,motif_activity = inputs
 
         # sequence input processing
-        x = self.stem_conv(sequence, training=training)
-        x = self.stem_res_conv(x, training=training)
-        x = self.stem_pool(x, training=training)
-        x = self.conv_tower(x, training=training)
+        sequence = self.stem_conv(sequence, training=training)
+        sequence = self.stem_res_conv(sequence, training=training)
+        sequence = self.stem_pool(sequence, training=training)
+        sequence = self.conv_tower(sequence, training=training)
 
         # atac input processsing
         atac_x = self.stem_conv_atac(atac, training=training)
@@ -304,7 +304,7 @@ class genformer(tf.keras.Model):
         motif_activity = self.motif_activity_fc2(motif_activity)
         motif_activity = tf.tile(motif_activity, [1, 4096, 1])
 
-        transformer_input = tf.concat([x,atac_x, motif_activity], axis=2) # append processed seq,atac,motif inputs in channel dim.
+        transformer_input = tf.concat([sequence,atac_x, motif_activity], axis=2) # append processed seq,atac,motif inputs in channel dim.
         out_performer,att_matrices = self.performer(transformer_input, training=training)
         out = self.crop_final(out_performer)
         out = self.final_pointwise_conv(out, training=training)
