@@ -13,13 +13,8 @@ sudo pip3 install scipy
 sudo pip3 install wandb
 sudo pip3 install plotly
 sudo pip3 install tensorboard-plugin-profile==2.4.0
-export TPU_NAME=pod
-export ZONE=us-east1-d 
-export TPU_LOAD_LIBRARY=0
 
-
-gsutil cp gs://picard-testing-176520/sonnet_weights.tar.gz .
+gsutil cp gs://genformer/picard-testing-archive/picard-testing-176520/sonnet_weights.tar.gz.tar.gz .
 tar -xzvf sonnet_weights.tar.gz
-
 
 wandb login
