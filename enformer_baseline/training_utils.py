@@ -275,7 +275,7 @@ def deserialize_val_TSS(serialized_example,input_length=196608,max_shift=4, out_
         'gene_name': tf.io.FixedLenFeature([], tf.string)
     }
 
-    shift = 5
+    shift = 2
     input_seq_length = input_length + max_shift
     interval_end = input_length + shift
 
@@ -291,7 +291,6 @@ def deserialize_val_TSS(serialized_example,input_length=196608,max_shift=4, out_
     target = tf.slice(target,
                       [320,0],
                       [896,-1])
-    
     
     tss_mask = tf.io.parse_tensor(example['tss_mask'],
                                   out_type=tf.int32)
@@ -454,11 +453,6 @@ def make_plots(y_trues,
     results_df['pred'] = y_preds
     results_df['cell_type_encoding'] = cell_types
     results_df['gene_encoding'] = gene_map
-    
-    print(np.unique(cell_types))
-    print(np.unique(cell_types).shape)
-    print(np.unique(gene_map))
-    print(np.unique(gene_map).shape)
     
     results_df=results_df.groupby(['gene_encoding', 'cell_type_encoding']).agg({'true': 'sum', 'pred': 'sum'})
     results_df['true'] = np.log2(1.0+results_df['true'])
