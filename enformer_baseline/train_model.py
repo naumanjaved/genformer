@@ -166,7 +166,7 @@ def main():
                                                             args.gcs_path_TSS,
                                                             GLOBAL_BATCH_SIZE,
                                                             196608,
-                                                            10,
+                                                            4,
                                                             1536,
                                                             args.num_targets,
                                                             args.num_parallel,
@@ -178,7 +178,6 @@ def main():
                 
             
             enformer_model = enformer.Enformer(output_heads_dict = {'human': 50})
-            SEQ_LENGTH = 196608
 
             date_string = f'{datetime.now():%Y-%m-%d %H:%M:%S%z}'
             date_string = date_string.replace(' ','_')
@@ -199,7 +198,7 @@ def main():
             scheduler2= tf.keras.optimizers.schedules.CosineDecay(
                 initial_learning_rate=wandb.config.lr_base2,
                 decay_steps=wandb.config.total_steps*wandb.config.num_epochs, alpha=1.0)
-            schedule2=optimizers.WarmUp(initial_learning_rate=wandb.config.lr_base2,
+            scheduler2=optimizers.WarmUp(initial_learning_rate=wandb.config.lr_base2,
                                          warmup_steps=math.ceil(wandb.config.warmup_frac*wandb.config.total_steps),
                                          decay_schedule_fn=scheduler2)
             optimizer1 = tf.keras.optimizers.Adam(learning_rate=scheduler1,epsilon=wandb.config.epsilon)
@@ -211,11 +210,11 @@ def main():
             
 
             train_step,val_step, val_step_TSS,build_step,metric_dict = training_utils.return_train_val_functions(enformer_model,
-                                                                                                                                        optimizers_in,
-                                                                                                                                        strategy,
-                                                                                                                                        metric_dict,
-                                                                                                                                        NUM_REPLICAS,
-                                                                                                                                        wandb.config.gradient_clip)
+                                                                                                                optimizers_in,
+                                                                                                                strategy,
+                                                                                                                metric_dict,
+                                                                                                                NUM_REPLICAS,
+                                                                                                                wandb.config.gradient_clip)
             
             
             ### main training loop
@@ -247,8 +246,7 @@ def main():
                         total_params += tf.size(var)
                     print('total params: ' + str(total_params)) 
 
-                    
-                    
+
                 # main training step 
                 print('starting epoch_', str(epoch_i))
                 start = time.time()
@@ -260,6 +258,15 @@ def main():
                 print('human_train_loss: ' + str(metric_dict['hg_tr'].result().numpy()))
                 wandb.log({'human_train_loss': metric_dict['hg_tr'].result().numpy()},
                           step=epoch_i)
+                tr_pearsonsR=metric_dict['tr_pearsonsR'].result()['PearsonR'].numpy()
+                wandb.log({'human_tr_tracks_pearsons': np.nanmean(tr_pearsonsR)},
+                          step=epoch_i)
+                print('human tr_pearsonsR: ' + str(np.nanmean(tr_pearsonsR)))
+                tr_R2=metric_dict['tr_R2'].result()['R2'].numpy()
+                wandb.log({'human_tr_tracks_R2': np.nanmean(tr_R2)},
+                          step=epoch_i)
+                print('human tr_r2: ' + str(np.nanmean(tr_R2)))
+
                 print('training duration(mins): ' + str(duration))
                 
                 start = time.time()
@@ -273,11 +280,12 @@ def main():
                 pearsonsR=metric_dict['pearsonsR'].result()['PearsonR'].numpy()
                 wandb.log({'human_val_tracks_pearsons': np.nanmean(pearsonsR)},
                           step=epoch_i)
+                print('human pearsonsR: ' + str(np.nanmean(pearsonsR)))
 
                 R2=metric_dict['R2'].result()['R2'].numpy()
-                wandb.log({'human_val_tracks_R2': np.nanmean(R2),
-                           'human_ATAC_R2': np.nanmean(R2)},
+                wandb.log({'human_val_tracks_R2': np.nanmean(R2)},
                           step=epoch_i)
+                print('human r2: ' + str(np.nanmean(R2)))
                 
                 print('computing TSS quant metrics')
                 pred_list = [] # list to store predictions
@@ -286,7 +294,6 @@ def main():
                 cell_list = []
                 for step in range(wandb.config.val_steps_TSS):
                     pred, true, gene, cell= strategy.run(val_step_TSS,args = (next(val_data_TSS_it),))
-                    true, pred = strategy.run(val_step, args=(next(data_val_ho),))
                     for x in strategy.experimental_local_results(true): # flatten the true values
                         true_list.append(tf.reshape(x, [-1]))
                     for x in strategy.experimental_local_results(pred): # flatten the pred values

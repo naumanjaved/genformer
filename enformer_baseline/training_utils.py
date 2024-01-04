@@ -105,10 +105,10 @@ def return_train_val_functions(model,
     metric_dict["hg_val"] = tf.keras.metrics.Mean("hg_val_loss",
                                                   dtype=tf.float32)
     
+    metric_dict['tr_pearsonsR'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
+    metric_dict['_trR2'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
+    
     metric_dict['pearsonsR'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
-    
-    metric_dict["hg_corr_stats"] = metrics.correlation_stats_gene_centered(name='hg_corr_stats')
-    
     metric_dict['R2'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
     loss_fn = tf.keras.losses.Poisson(reduction=tf.keras.losses.Reduction.NONE)
 
@@ -132,6 +132,8 @@ def return_train_val_functions(model,
         optimizer1.apply_gradients(zip(gradients[:len(model.trunk.trainable_variables)], model.trunk.trainable_variables))
         optimizer2.apply_gradients(zip(gradients[len(model.trunk.trainable_variables):], model.new_heads['human'].trainable_variables))
         metric_dict["hg_tr"].update_state(loss)
+        metric_dict['tr_pearsonsR'].update_state(target, output)
+        metric_dict['_trR2'].update_state(target, output)
 
     @tf.function(jit_compile=True)
     def val_step(inputs):
@@ -181,7 +183,7 @@ def return_train_val_functions(model,
     return train_step, val_step, val_step_TSS, build_step, metric_dict
 
 
-def deserialize_tr(serialized_example,input_length=196608,max_shift=4, 
+def deserialize_tr(serialized_example,input_length=196608,max_shift=4,
                    out_length=1536,num_targets=50, g=None):
     """Deserialize bytes stored in TFRecordFile."""
     feature_map = {
@@ -207,7 +209,6 @@ def deserialize_tr(serialized_example,input_length=196608,max_shift=4,
             seq_shift=0
     
     input_seq_length = input_length + max_shift
-
 
     example = tf.io.parse_example(serialized_example, feature_map)
     sequence = tf.io.decode_raw(example['sequence'], tf.bool)
