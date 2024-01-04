@@ -178,7 +178,7 @@ def return_train_val_functions(model,
         for _ in tf.range(1): ## for loop within @tf.fuction for improved TPU performance
             strategy.run(val_step, args=(next(iterator),))
         
-    return dist_train_step_full, dist_train_step_head_only, dist_val_step, dist_val_step_TSS, build_step,metric_dict
+    return train_step, val_step, val_step_TSS, build_step, metric_dict
 
 
 def deserialize_tr(serialized_example,input_length=196608,max_shift=4, 
@@ -262,7 +262,7 @@ def deserialize_val(serialized_example,input_length=196608,max_shift=4, out_leng
     return {'sequence': tf.ensure_shape(sequence,
                                         [input_length,4]),
             'target': tf.ensure_shape(target,
-                                      [896,54])}
+                                      [896,50])}
 
 
 def deserialize_val_TSS(serialized_example,input_length=196608,max_shift=4, out_length=1536,num_targets=50):

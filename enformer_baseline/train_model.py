@@ -140,18 +140,16 @@ def main():
             '''
             options = tf.data.Options()
             options.experimental_distribute.auto_shard_policy=\
-                tf.data.experimental.AutoShardPolicy.OFF
+                tf.data.experimental.AutoShardPolicy.DATA
             options.deterministic=False
-            options.experimental_threading.max_intra_op_parallelism=1
-            tf.config.optimizer.set_jit(True)
 
             NUM_REPLICAS = strategy.num_replicas_in_sync
             BATCH_SIZE_PER_REPLICA=1
             GLOBAL_BATCH_SIZE = BATCH_SIZE_PER_REPLICA*NUM_REPLICAS
-            
+            print(GLOBAL_BATCH_SIZE)
             num_train=wandb.config.train_examples
             num_val=wandb.config.val_examples
-            num_val_TSS=wandb.config.val_examples_TSS#4192000
+            num_val_TSS=wandb.config.val_examples_TSS
 
             wandb.config.update({"train_steps": num_train // (GLOBAL_BATCH_SIZE)},
                                 allow_val_change=True)
