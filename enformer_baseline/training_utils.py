@@ -133,7 +133,7 @@ def return_train_val_functions(model,
         optimizer2.apply_gradients(zip(gradients[len(model.trunk.trainable_variables):], model.new_heads['human'].trainable_variables))
         metric_dict["hg_tr"].update_state(loss)
         metric_dict['tr_pearsonsR'].update_state(target, output)
-        metric_dict['_trR2'].update_state(target, output)
+        metric_dict['tr_R2'].update_state(target, output)
 
     @tf.function(jit_compile=True)
     def val_step(inputs):
