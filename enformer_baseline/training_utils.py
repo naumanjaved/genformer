@@ -106,7 +106,7 @@ def return_train_val_functions(model,
                                                   dtype=tf.float32)
     
     metric_dict['tr_pearsonsR'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
-    metric_dict['_trR2'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
+    metric_dict['tr_R2'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
     
     metric_dict['pearsonsR'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
     metric_dict['R2'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
