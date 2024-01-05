@@ -14,43 +14,31 @@ import src.utils as utils
 from tensorflow.keras import regularizers
 from tensorflow.keras.layers.experimental import SyncBatchNormalization as syncbatchnorm
 
+@tf.keras.utils.register_keras_serializable()
+class SoftmaxPooling1D(kl.Layer):
+    """Softmax pooling layer."""
+    def __init__(self,
+                 pool_size=2, w_init_scale=2.0, name='softmax_pooling', **kwargs):
+        super().__init__(name=name, **kwargs)
+        self.pool_size = pool_size
+        self.w_init_scale = w_init_scale
 
-def deconv_block(
-    filters, 
-    kernel_size=3,
-    strides=8,
-    padding='same',
-    name = 'deconv_block',
-    BN_momentum=0.90,
-    **kwargs):
-    """
-    Creates a deconvolutional block with batch normalization and GELU activation.
+        self.dense = kl.Dense(
+            units = 1,
+            use_bias=False,
+            kernel_initializer=tf.keras.initializers.Identity(gain=self.w_init_scale))
 
-    Parameters:
-    - filters: Number of filters for the Conv1DTranspose layer.
-    - kernel_size: Kernel size for the Conv1D layer.
-    - stride: Stride for the Conv1D layer.
-    - **kwargs: Additional keyword arguments passed to BatchNormalization and Conv1D layers.
+    def call(self, inputs, **kwargs):
+        _, length, num_features = inputs.shape
+        # Reshape input for pooling
+        inputs = tf.reshape(inputs, [-1, length//self.pool_size,
+                                              self.pool_size, num_features])
 
-    Returns:
-    - A TensorFlow Keras Sequential model comprising a batch normalization layer,
-    a GELU activation layer, and a transposed conv layer.
-    """
-    return tf.keras.Sequential([
-        tf.keras.layers.Conv1DTranspose(
-            filters=filters,  # Same as the number of channels in the input
-            kernel_size=kernel_size,
-            strides=strides, 
-            padding='same' 
-        ),
-        tf.keras.layers.BatchNormalization(
-            axis=-1, 
-            synchronized=True, 
-            center=True, 
-            scale=True, 
-            momentum=BN_momentum, 
-            epsilon=1.0e-05, **kwargs),
-        tfa.layers.GELU()], name=name)
+        # Apply the depthwise convolution to compute logits
+        dense_out = self.dense(inputs)
+        # Compute softmax weights
+        dense_out = tf.nn.softmax(dense_out, axis=-2)
+        return tf.reduce_sum(inputs * dense_out, axis=-2)
 
 def conv_block(
     filters, 
