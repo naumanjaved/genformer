@@ -117,7 +117,7 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
                    input_length = 524288, max_shift = 4, output_length_ATAC = 131072,
                    output_length = 4096, crop_size = 2, output_res = 128,
                    atac_mask_dropout = 0.15, mask_size = 1536, log_atac = False,
-                   use_atac = True, use_seq = True, atac_corrupt_rate = 20, seq_mask = True):
+                   use_atac = True, use_seq = True, atac_corrupt_rate = 20):
     """
     Deserialize a serialized example from a TFRecordFile and apply various transformations
     and augmentations to the data. Among these, the input atac profile will have one atac peak
@@ -413,7 +413,7 @@ def return_dataset(gcs_path, split, batch, input_length, output_length_ATAC,
                    num_parallel, num_epoch, atac_mask_dropout,
                    random_mask_size, log_atac, use_atac, use_seq, seed,
                    atac_corrupt_rate, validation_steps,
-                   use_motif_activity, g, seq_mask):
+                   use_motif_activity, g):
     """
     return a tf dataset object for given gcs path
     """
@@ -435,7 +435,7 @@ def return_dataset(gcs_path, split, batch, input_length, output_length_ATAC,
                 crop_size, output_res,
                 atac_mask_dropout, random_mask_size,
                 log_atac, use_atac, use_seq,
-                atac_corrupt_rate, seq_mask),
+                atac_corrupt_rate),
             deterministic=False,
             num_parallel_calls=num_parallel)
 
@@ -620,7 +620,6 @@ def parse_args(parser):
     parser.add_argument('--total_weight_loss',type=str, default="0.15", help= 'total_weight_loss')
     parser.add_argument('--use_rot_emb',type=str, default="True", help= 'use_rot_emb')
     parser.add_argument('--best_val_loss', type=float, default=0.09113)
-    parser.add_argument('--seq_mask', type=str, default="True", help= 'whether to apply low level sequence corruption')
     args = parser.parse_args()
     return parser
 

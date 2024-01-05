@@ -73,7 +73,6 @@ def main():
                 'loss_type': {'values': [str(x) for x in args.loss_type.split(',')]},
                 'total_weight_loss': {'values': [float(x) for x in args.total_weight_loss.split(',')]},
                 'use_rot_emb': {'values':[parse_bool_str(x) for x in args.use_rot_emb.split(',')]},
-                'seq_mask': {'values':[parse_bool_str(x) for x in args.seq_mask.split(',')]},
                 'best_val_loss': {'values':[float(args.best_val_loss)]}
                 }
     }
@@ -153,7 +152,7 @@ def main():
                                                                 wandb.config.use_atac, wandb.config.use_seq, wandb.config.seed,
                                                                 wandb.config.val_data_seed, wandb.config.atac_corrupt_rate,
                                                                 wandb.config.val_steps_ho, wandb.config.use_motif_activity,
-                                                                g, g_val, wandb.config.seq_mask)
+                                                                g, g_val)
 
             print('created dataset iterators')
             print(wandb.config)

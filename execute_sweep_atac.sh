@@ -54,5 +54,4 @@ python3 train_model_atac.py \
             --total_weight_loss="0.15" \
             --use_rot_emb="True" \
             --best_val_loss=100.0 \
-            --loss_type="poisson" \
-            --seq_mask="True"
+            --loss_type="poisson"
