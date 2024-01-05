@@ -114,10 +114,10 @@ def return_train_val_functions(model, optimizer,
 
 
 def deserialize_tr(serialized_example, g, use_motif_activity,
-                   input_length = 524288, max_shift = 10, output_length_ATAC = 131072,
+                   input_length = 524288, max_shift = 4, output_length_ATAC = 131072,
                    output_length = 4096, crop_size = 2, output_res = 128,
                    atac_mask_dropout = 0.15, mask_size = 1536, log_atac = False,
-                   use_atac = True, use_seq = True, atac_corrupt_rate = 20, seq_mask = True):
+                   use_atac = True, use_seq = True, atac_corrupt_rate = 20, seq_mask = False):
     """
     Deserialize a serialized example from a TFRecordFile and apply various transformations
     and augmentations to the data. Among these, the input atac profile will have one atac peak
@@ -203,6 +203,8 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
     min_val = tf.reduce_min(motif_activity)
     max_val = tf.reduce_max(motif_activity)
     motif_activity = (motif_activity - min_val) / (max_val - min_val)
+    motif_activity = motif_activity + \
+        tf.math.abs(g.normal(motif_activity.shape,mean=0.0,stddev=0.00001,dtype=tf.float32))
     
     if not use_motif_activity: # if running ablation, just set TF activity to 0
         print('not using tf activity')
@@ -253,14 +255,8 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
         print('not using sequence')
         sequence = tf.random.experimental.stateless_shuffle(sequence, seed=[randomish_seed+1,randomish_seed+3])
 
-    if seq_mask:
-        print('low level sequence masking')
-        sequence = mask_sequence(sequence, input_length,
-                                    bin_size=(output_res // 4), # mask 4 random bases per 128 bp
-                                    kmer_size=1,
-                                    seed=randomish_seed+11)
 
-    return tf.cast(tf.ensure_shape(sequence,[input_length,4]),dtype=tf.bfloat16), \
+    return tf.cast(sequence,dtype=tf.bfloat16), \
                 tf.cast(tf.ensure_shape(masked_atac, [output_length_ATAC,1]),dtype=tf.bfloat16), \
                 tf.cast(tf.ensure_shape(full_comb_mask_store, [output_length-crop_size*2,1]),dtype=tf.int32), \
                 tf.cast(tf.ensure_shape(atac_out,[output_length-crop_size*2,1]),dtype=tf.float32), \
@@ -348,6 +344,8 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
     min_val = tf.reduce_min(motif_activity)
     max_val = tf.reduce_max(motif_activity)
     motif_activity = (motif_activity - min_val) / (max_val - min_val)
+    motif_activity = motif_activity + \
+        tf.math.abs(g.normal(motif_activity.shape,mean=0.0,stddev=0.00001,dtype=tf.float32))
     
     if not use_motif_activity: # if running ablation, just set TF activity to 0
         print('not using tf activity')
