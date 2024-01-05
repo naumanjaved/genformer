@@ -100,8 +100,6 @@ def return_train_val_functions(model, optimizer,
         metric_dict["val_loss"].update_state(loss)
         metric_dict['ATAC_PearsonR'].update_state(target_atac, output_atac)
         metric_dict['ATAC_R2'].update_state(target_atac, output_atac)
-        return target_atac, output_atac
-
 
     def build_step(iterator): # just to build the model
         @tf.function(reduce_retracing=True)

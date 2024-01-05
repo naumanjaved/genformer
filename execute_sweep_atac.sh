@@ -1,14 +1,14 @@
 #!/bin/bash -l
 
 python3 train_model_atac.py \
-            --tpu_name="pod11" \
-            --tpu_zone="us-east1-d" \
+            --tpu_name="pod1" \
+            --tpu_zone="us-central1-a" \
             --wandb_project="atac_pretraining" \
             --wandb_user="njaved" \
             --wandb_sweep_name="atac_pretraining" \
             --gcs_project="picard-testing-176520" \
-            --gcs_path="gs://genformer/atac_pretrain/524k/genformer_atac_pretrain_globalacc_conv_fpm" \
-            --gcs_path_holdout="gs://genformer/atac_pretrain/524k/genformer_atac_pretrain_globalacc_conv_fpm_valid" \
+            --gcs_path="gs://genformer_uscentral_temporary_copy/atac_pretrain/524k/genformer_atac_pretrain_globalacc_conv_fpm" \
+            --gcs_path_holdout="gs://genfgenformer_uscentral_temporary_copyormer/atac_pretrain/524k/genformer_atac_pretrain_globalacc_conv_fpm_valid" \
             --input_length=524288 \
             --output_length=4096 \
             --output_length_ATAC=131072 \
@@ -23,24 +23,24 @@ python3 train_model_atac.py \
             --output_res=128 \
             --min_delta=0.0000005 \
             --model_save_dir="gs://genformer/atac_pretrain/models" \
-            --model_save_basename="aformer" \
+            --model_save_basename="genformer" \
             --lr_base="1.0e-04" \
             --decay_frac="0.10" \
             --gradient_clip="5.0" \
             --epsilon=1.0e-8 \
-            --num_transformer_layers="10" \
+            --num_transformer_layers="9" \
             --dropout_rate="0.20" \
             --pointwise_dropout_rate="0.10" \
             --num_heads="4" \
             --num_random_features="256" \
             --kernel_transformation="relu_kernel_transformation" \
-            --savefreq=1 \
+            --savefreq=501 \
             --load_init="False" \
             --rectify="True" \
             --filter_list_seq="512,512,768,768,1024,1024" \
             --filter_list_atac="32,64" \
             --atac_mask_dropout=0.15 \
-            --atac_mask_dropout_val=0.05 \
+            --atac_mask_dropout_val=0.15 \
             --log_atac="False" \
             --random_mask_size="1536" \
             --use_atac="True" \

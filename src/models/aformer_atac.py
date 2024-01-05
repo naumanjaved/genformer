@@ -111,7 +111,7 @@ class genformer(tf.keras.Model):
         self.stem_res_conv=Residual(conv_block(int(self.filter_list_seq[0]), 1, 
                                                     BN_momentum=self.BN_momentum,
                                                     name='pointwise_conv_block'))
-        self.stem_pool = SoftmaxPooling1D()
+        self.stem_pool = SoftmaxPooling1D(name='stem_pool')
 
         # convolutional stem for ATAC profile
         self.stem_conv_atac = tf.keras.layers.Conv1D(
@@ -135,7 +135,7 @@ class genformer(tf.keras.Model):
                                stride=1,
                                BN_momentum=self.BN_momentum,
                                padding='same'),
-                SoftmaxPooling1D()],
+                SoftmaxPooling1D(name=f'soft_max_pool_{i}')],
                        name=f'conv_tower_block_{i}')
             for i, num_filters in enumerate(self.filter_list_seq)], name='conv_tower')
 

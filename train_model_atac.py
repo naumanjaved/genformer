@@ -208,13 +208,10 @@ def main():
                     total_weight=wandb.config.total_weight_loss
                 )
 
-
-            global_step = 0
             val_losses = []
             if wandb.config.load_init: # if loading pretrained model, initialize the best val loss from previous run
                 val_losses.append(wandb.config.best_val_loss)
             val_pearsons = [] # track pearsons per epoch
-            val_R2 = [] # track r2 per epoch
             patience_counter = 0 # simple patience counter for early stopping
             stop_criteria = False
             best_epoch = 0 # track epoch with best validation loss 
@@ -256,33 +253,20 @@ def main():
                 # - run the validation loop
                 # - return the true and predicted values to allow for plotting and other metrics
                 start = time.time()
-                pred_list = [] # list to store predictions
-                true_list = [] # list to store true values
-                for k in range(wandb.config.val_steps_ho):
-                    true, pred = strategy.run(val_step, args=(next(data_val_ho),))
-                    for x in strategy.experimental_local_results(true): # flatten the true values
-                        true_list.append(tf.reshape(x, [-1]))
-                    for x in strategy.experimental_local_results(pred): # flatten the pred values
-                        pred_list.append(tf.reshape(x, [-1]))
 
-                figures,overall_corr,overall_corr_log= training_utils.make_plots(tf.concat(pred_list,0),
-                                                                                 tf.concat(true_list,0),
-                                                                                 5000)
+                for k in range(wandb.config.val_steps_ho):
+                    strategy.run(val_step, args=(next(data_val_ho),))
 
                 val_loss = NUM_REPLICAS * metric_dict['val_loss'].result().numpy() # multiply by NUM_REPLICAS to get total loss 
                 print('val_loss: ' + str(val_loss))
 
                 val_losses.append(val_loss)
-                wandb.log({'val_loss': val_loss},
-                           step=step_num)
+                wandb.log({'val_loss': val_loss}, step=step_num)
                 val_pearsons.append(metric_dict['ATAC_PearsonR'].result()['PearsonR'].numpy())
                 print('ATAC_pearsons: ' + str(metric_dict['ATAC_PearsonR'].result()['PearsonR'].numpy()))
                 print('ATAC_R2: ' + str(metric_dict['ATAC_R2'].result()['R2'].numpy()))
                 wandb.log({'ATAC_pearsons': metric_dict['ATAC_PearsonR'].result()['PearsonR'].numpy(),
                            'ATAC_R2': metric_dict['ATAC_R2'].result()['R2'].numpy()},
-                          step=step_num)
-
-                wandb.log({'overall_predictions': figures},
                           step=step_num)
 
                 duration = (time.time() - start) / 60.
