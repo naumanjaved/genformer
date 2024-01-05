@@ -140,8 +140,6 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
     - use_atac: whether to use the input ATAC profile
     - use_seq: whether to use the input sequence
     - atac_corrupt_rate: rate at which to corrupt the input ATAC profile
-    - seq_mask: whether to mask the input sequence at low level (4 bases per 128bp). 
-                originally added as part of potential MLM task, but now maybe just useful for regularization
 
     Returns:
     - Tuple of processed sequence, masked ATAC input, mask, ATAC output, and motif activity tensors.
@@ -255,12 +253,11 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
         print('not using sequence')
         sequence = tf.zeros_like(sequence)
 
-    if seq_mask:
-        print('low level sequence masking')
-        sequence = mask_sequence(sequence,input_length, 
-                                    bin_size=(output_res // 4), # mask 4 random bases per 128 bp
-                                    kmer_size=1,
-                                    seed=randomish_seed+12)
+    print('low level sequence masking')
+    sequence = mask_sequence(sequence,input_length, 
+                                bin_size=(output_res // 4), # mask 4 random bases per 128 bp
+                                kmer_size=1,
+                                seed=randomish_seed+12)
 
     return tf.cast(tf.ensure_shape(sequence,[input_length,4]),dtype=tf.bfloat16), \
                 tf.cast(tf.ensure_shape(masked_atac, [output_length_ATAC,1]),dtype=tf.bfloat16), \
