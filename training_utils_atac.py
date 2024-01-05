@@ -255,7 +255,6 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
         print('not using sequence')
         sequence = tf.random.experimental.stateless_shuffle(sequence, seed=[randomish_seed+1,randomish_seed+3])
 
-
     return tf.cast(sequence,dtype=tf.bfloat16), \
                 tf.cast(tf.ensure_shape(masked_atac, [output_length_ATAC,1]),dtype=tf.bfloat16), \
                 tf.cast(tf.ensure_shape(full_comb_mask_store, [output_length-crop_size*2,1]),dtype=tf.int32), \
@@ -414,7 +413,8 @@ def return_dataset(gcs_path, split, batch, input_length, output_length_ATAC,
     wc = "*.tfr"
 
     if split == 'train':
-        list_files = (tf.io.gfile.glob(os.path.join(gcs_path, split, wc))) 
+        list_files = (tf.io.gfile.glob(os.path.join(gcs_path, split, wc)))
+        print(list_files)
         files = tf.data.Dataset.list_files(list_files,seed=seed,shuffle=True)
 
         dataset = tf.data.TFRecordDataset(files, compression_type='ZLIB', num_parallel_reads=num_parallel)
@@ -437,7 +437,7 @@ def return_dataset(gcs_path, split, batch, input_length, output_length_ATAC,
 
     else:
         list_files = (tf.io.gfile.glob(os.path.join(gcs_path, split, wc)))
-
+        print(list_files)
         files = tf.data.Dataset.list_files(list_files,shuffle=False)
         dataset = tf.data.TFRecordDataset(files, compression_type='ZLIB', num_parallel_reads=num_parallel)
         dataset = dataset.with_options(options)
@@ -449,7 +449,7 @@ def return_dataset(gcs_path, split, batch, input_length, output_length_ATAC,
                 crop_size, output_res,
                 atac_mask_dropout, random_mask_size,
                 log_atac, use_atac, use_seq),
-            deterministic=True,
+            deterministic=False,
             num_parallel_calls=num_parallel)
 
         return dataset.take(batch*validation_steps).batch(batch).repeat((num_epoch*2)).prefetch(tf.data.AUTOTUNE)
