@@ -53,6 +53,6 @@ python3 train_model_atac.py \
             --num_epochs_to_start="0" \
             --total_weight_loss="0.15" \
             --use_rot_emb="True" \
-            --best_val_loss=1.0 \
+            --best_val_loss=100.0 \
             --loss_type="poisson" \
-            --seq_mask="False"
+            --seq_mask="True"

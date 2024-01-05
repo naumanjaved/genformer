@@ -117,7 +117,7 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
                    input_length = 524288, max_shift = 4, output_length_ATAC = 131072,
                    output_length = 4096, crop_size = 2, output_res = 128,
                    atac_mask_dropout = 0.15, mask_size = 1536, log_atac = False,
-                   use_atac = True, use_seq = True, atac_corrupt_rate = 20, seq_mask = False):
+                   use_atac = True, use_seq = True, atac_corrupt_rate = 20, seq_mask = True):
     """
     Deserialize a serialized example from a TFRecordFile and apply various transformations
     and augmentations to the data. Among these, the input atac profile will have one atac peak
@@ -160,7 +160,6 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
     rev_comp = tf.math.round(g.uniform([], 0, 1)) # switch to govern reverse complementation 
     atac_mask_int = g.uniform([], 0, atac_corrupt_rate, dtype=tf.int32) # random increase ATAC masking w/ 1/atac_corrupt_rate prob. 
     randomish_seed = g.uniform([], 0, 100000000,dtype=tf.int32) # work-around to ensure random-ish stateless operations
-
 
     rev_comp = tf.random.stateless_uniform(shape=[],
                                             minval=0,
@@ -237,6 +236,7 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
         sequence = tf.reverse(sequence, axis=[0])
         atac_target = tf.reverse(atac_target,axis=[0])
         masked_atac = tf.reverse(masked_atac,axis=[0])
+        full_comb_mask = tf.reverse(full_comb_mask,axis=[0])
         full_comb_mask_store=tf.reverse(full_comb_mask_store,axis=[0])
 
     # generate the output atac profile by summing the inputs to a desired resolution
@@ -253,9 +253,16 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
 
     if not use_seq:
         print('not using sequence')
-        sequence = tf.random.experimental.stateless_shuffle(sequence, seed=[randomish_seed+1,randomish_seed+3])
+        sequence = tf.zeros_like(sequence)
 
-    return tf.cast(sequence,dtype=tf.bfloat16), \
+    if seq_mask:
+        print('low level sequence masking')
+        sequence = mask_sequence(sequence,input_length, 
+                                    bin_size=(output_res // 4), # mask 4 random bases per 128 bp
+                                    kmer_size=1,
+                                    seed=randomish_seed+12)
+
+    return tf.cast(tf.ensure_shape(sequence,[input_length,4]),dtype=tf.bfloat16), \
                 tf.cast(tf.ensure_shape(masked_atac, [output_length_ATAC,1]),dtype=tf.bfloat16), \
                 tf.cast(tf.ensure_shape(full_comb_mask_store, [output_length-crop_size*2,1]),dtype=tf.int32), \
                 tf.cast(tf.ensure_shape(atac_out,[output_length-crop_size*2,1]),dtype=tf.float32), \
@@ -316,7 +323,7 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
     peaks_c_crop = tf.slice(peaks_center, [crop_size,0], [output_length-2*crop_size,-1]) # crop at the outset 
 
     peaks_sum = tf.reduce_sum(peaks_center)
-    
+
     randomish_seed = peaks_sum + tf.cast(tf.reduce_sum(atac),dtype=tf.int32)
 
     rev_comp = tf.random.stateless_uniform(
@@ -393,9 +400,9 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
 
     if not use_seq:
         print('not using sequence')
-        sequence = tf.random.experimental.stateless_shuffle(sequence, seed=[randomish_seed+1,randomish_seed+3])
+        sequence = tf.zeros_like(sequence)
 
-    return tf.cast(tf.ensure_shape(sequence,[input_length,4]),dtype=tf.bfloat16), \
+    return tf.cast(sequence,dtype=tf.bfloat16), \
                 tf.cast(tf.ensure_shape(masked_atac, [output_length_ATAC,1]),dtype=tf.bfloat16), \
                 tf.cast(tf.ensure_shape(full_comb_mask_store, [output_length-crop_size*2,1]),dtype=tf.int32), \
                 tf.cast(tf.ensure_shape(atac_out,[output_length-crop_size*2,1]),dtype=tf.float32), \
@@ -414,7 +421,6 @@ def return_dataset(gcs_path, split, batch, input_length, output_length_ATAC,
 
     if split == 'train':
         list_files = (tf.io.gfile.glob(os.path.join(gcs_path, split, wc)))
-        print(list_files)
         files = tf.data.Dataset.list_files(list_files,seed=seed,shuffle=True)
 
         dataset = tf.data.TFRecordDataset(files, compression_type='ZLIB', num_parallel_reads=num_parallel)
@@ -437,7 +443,6 @@ def return_dataset(gcs_path, split, batch, input_length, output_length_ATAC,
 
     else:
         list_files = (tf.io.gfile.glob(os.path.join(gcs_path, split, wc)))
-        print(list_files)
         files = tf.data.Dataset.list_files(list_files,shuffle=False)
         dataset = tf.data.TFRecordDataset(files, compression_type='ZLIB', num_parallel_reads=num_parallel)
         dataset = dataset.with_options(options)
@@ -463,21 +468,21 @@ def return_distributed_iterators(gcs_path, gcs_path_ho, global_batch_size,
                                  random_mask_size,
                                  log_atac, use_atac, use_seq, seed,seed_val,
                                  atac_corrupt_rate, 
-                                 validation_steps, use_motif_activity, g, g_val, seq_mask):
+                                 validation_steps, use_motif_activity, g, g_val):
 
     tr_data = return_dataset(gcs_path, "train", global_batch_size, input_length,
                              output_length_ATAC, output_length, crop_size,
                              output_res, max_shift, options, num_parallel_calls,
                              num_epoch, atac_mask_dropout, random_mask_size,
                              log_atac, use_atac, use_seq, seed,
-                             atac_corrupt_rate, validation_steps, use_motif_activity, g, seq_mask)
+                             atac_corrupt_rate, validation_steps, use_motif_activity, g)
 
     val_data_ho = return_dataset(gcs_path_ho, "valid", global_batch_size, input_length,
                                  output_length_ATAC, output_length, crop_size,
                                  output_res, max_shift, options_val, num_parallel_calls, num_epoch,
                                  atac_mask_dropout_val, random_mask_size, log_atac,
                                  use_atac, use_seq, seed_val, atac_corrupt_rate,
-                                 validation_steps, use_motif_activity, g_val, seq_mask)
+                                 validation_steps, use_motif_activity, g_val)
 
     val_dist_ho=strategy.experimental_distribute_dataset(val_data_ho)
     val_data_ho_it = iter(val_dist_ho)
@@ -802,6 +807,7 @@ def mask_ATAC_profile(output_length_ATAC, output_length, crop_size, mask_size,ou
     atac_mask = tf.reshape(atac_mask, [-1])
     atac_mask = tf.expand_dims(atac_mask,axis=1)
     full_atac_mask = tf.concat([edge_append,atac_mask,edge_append],axis=0)
+
 
     # -----------------------here we COMBINE atac and peak mask -------------------------------------------------
     full_comb_mask = tf.math.floor((dense_peak_mask + full_atac_mask)/2) # if either mask is 0, mask value set to 0
