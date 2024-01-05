@@ -244,7 +244,6 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
     atac_out = tf.clip_by_value(atac_out, clip_value_min=0.0, clip_value_max=2000.0) + diff
     atac_out = tf.slice(atac_out, [crop_size,0], [output_length-2*crop_size,-1]) # crop to desired length 
 
-
     # in case we want to run ablation without these inputs
     if not use_atac:
         print('not using atac')
@@ -256,10 +255,10 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
 
     if seq_mask:
         print('low level sequence masking')
-        sequence = mask_sequence(sequence,input_length, 
+        sequence = mask_sequence(sequence, input_length,
                                     bin_size=(output_res // 4), # mask 4 random bases per 128 bp
                                     kmer_size=1,
-                                    seed=randomish_seed+12)
+                                    seed=randomish_seed+11)
 
     return tf.cast(tf.ensure_shape(sequence,[input_length,4]),dtype=tf.bfloat16), \
                 tf.cast(tf.ensure_shape(masked_atac, [output_length_ATAC,1]),dtype=tf.bfloat16), \
@@ -267,7 +266,7 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
                 tf.cast(tf.ensure_shape(atac_out,[output_length-crop_size*2,1]),dtype=tf.float32), \
                 tf.cast(tf.ensure_shape(motif_activity, [1,693]),dtype=tf.bfloat16)
 
-def deserialize_val(serialized_example, g, use_motif_activity,
+def deserialize_val(serialized_example, g_val, use_motif_activity,
                    input_length = 524288, max_shift = 10, output_length_ATAC = 131072,
                    output_length = 4096, crop_size = 2, output_res = 128,
                    atac_mask_dropout = 0.15, mask_size = 1536, log_atac = False,
@@ -322,7 +321,7 @@ def deserialize_val(serialized_example, g, use_motif_activity,
     peaks_c_crop = tf.slice(peaks_center, [crop_size,0], [output_length-2*crop_size,-1]) # crop at the outset 
 
     peaks_sum = tf.reduce_sum(peaks_center)
-
+    
     randomish_seed = peaks_sum + tf.cast(tf.reduce_sum(atac),dtype=tf.int32)
 
     rev_comp = tf.random.stateless_uniform(
@@ -806,7 +805,6 @@ def mask_ATAC_profile(output_length_ATAC, output_length, crop_size, mask_size,ou
     atac_mask = tf.expand_dims(atac_mask,axis=1)
     full_atac_mask = tf.concat([edge_append,atac_mask,edge_append],axis=0)
 
-
     # -----------------------here we COMBINE atac and peak mask -------------------------------------------------
     full_comb_mask = tf.math.floor((dense_peak_mask + full_atac_mask)/2) # if either mask is 0, mask value set to 0
     full_comb_mask_store = 1.0 - full_comb_mask # store the mask after inverting it to get the masked region indices
@@ -820,11 +818,11 @@ def mask_ATAC_profile(output_length_ATAC, output_length, crop_size, mask_size,ou
     return full_comb_mask, full_comb_mask_store
 
 
-def mask_sequence(sequence, sequence_length, bin_size=128, kmer_size=4, seed=4):
+def mask_sequence(sequence, sequence_length, bin_size=32, kmer_size=1, seed=4):
     num_stretches = sequence_length // bin_size
 
     start_indices = tf.random.stateless_uniform(shape=[num_stretches], 
-                                                minval=0, 
+                                                minval=0,
                                                 maxval=bin_size - kmer_size + 1,
                                                 seed=[seed+11, seed+2],
                                                 dtype=tf.int32) + \
@@ -840,3 +838,5 @@ def mask_sequence(sequence, sequence_length, bin_size=128, kmer_size=4, seed=4):
 
     sequence_masked = sequence * tf.expand_dims(mask,axis=1)
     return sequence_masked
+
+

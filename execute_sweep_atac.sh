@@ -8,7 +8,7 @@ python3 train_model_atac.py \
             --wandb_sweep_name="atac_pretraining" \
             --gcs_project="picard-testing-176520" \
             --gcs_path="gs://genformer_uscentral_temporary_copy/atac_pretrain/524k/genformer_atac_pretrain_globalacc_conv_fpm" \
-            --gcs_path_holdout="gs://genfgenformer_uscentral_temporary_copyormer/atac_pretrain/524k/genformer_atac_pretrain_globalacc_conv_fpm_valid" \
+            --gcs_path_holdout="gs://genformer_uscentral_temporary_copy/atac_pretrain/524k/genformer_atac_pretrain_globalacc_conv_fpm_valid" \
             --input_length=524288 \
             --output_length=4096 \
             --output_length_ATAC=131072 \
@@ -55,4 +55,4 @@ python3 train_model_atac.py \
             --use_rot_emb="True" \
             --best_val_loss=1.0 \
             --loss_type="poisson" \
-            --seq_mask="True"
+            --seq_mask="False"
