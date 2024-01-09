@@ -113,7 +113,9 @@ def main():
                                  'motif-' + str(wandb.config.use_motif_activity)])
             date_string = f'{datetime.now():%Y-%m-%d %H:%M:%S%z}'
             date_string = date_string.replace(' ','_')
-            wandb.run.name = run_name
+            date_string = f'{datetime.now():%Y-%m-%d %H:%M:%S%z}'
+            date_string = date_string.replace(' ','_')
+            run_name = run_name + "_" + date_string
 
             # TFrecord dataset options
             options = tf.data.Options()
