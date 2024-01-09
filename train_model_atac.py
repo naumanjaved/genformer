@@ -107,13 +107,13 @@ def main():
 
             wandb.config.crop_size = (wandb.config.output_length - wandb.config.final_output_length) // 2
             run_name = '_'.join([str(int(wandb.config.input_length) / 1000)[:4].rstrip('.') + 'k',
-                                 'load-' + str(wandb.config.load_init),
                                  'LR-' + str(wandb.config.lr_base),
+                                 'C-' + '_'.join([str(x) for x in wandb.config.filter_list_seq]),
                                  'T-' + str(wandb.config.num_transformer_layers),
-                                 'TF-' + str(wandb.config.use_motif_activity)])
+                                 'motif-' + str(wandb.config.use_motif_activity)])
             date_string = f'{datetime.now():%Y-%m-%d %H:%M:%S%z}'
             date_string = date_string.replace(' ','_')
-            wandb.run.name = run_name + "_" + date_string
+            wandb.run.name = run_name
 
             # TFrecord dataset options
             options = tf.data.Options()
@@ -189,11 +189,21 @@ def main():
                                          decay_schedule_fn=scheduler)
             optimizer = tf.keras.optimizers.AdamW(learning_rate=scheduler, 
                                                     epsilon=wandb.config.epsilon,
-                                                    weight_decay=1.0e-03,
+                                                    weight_decay=1.0e-05,
                                                     global_clipnorm=wandb.config.gradient_clip)
             optimizer.exclude_from_weight_decay(var_names = ['bias', 'batch_norm','layer_norm', 
                                                             'BN', 'LN', 'LayerNorm','BatchNorm'])
             metric_dict = {} # initialize dictionary to store metrics
+
+            ckpt = tf.train.Checkpoint(step=tf.Variable(1),optimizer=optimizer, 
+                                                            model=model)
+            checkpoint_dir = wandb.config.model_save_dir + \
+                                '/' + wandb.config.model_save_basename + \
+                                    "_" + wandb.run.name
+            
+            manager = tf.train.CheckpointManager(ckpt, 
+                                                 directory=checkpoint_dir,
+                                                 max_to_keep=10)
 
             # initialize functions for training and validation steps
             train_step, val_step, build_step, metric_dict = \
@@ -210,7 +220,6 @@ def main():
             val_losses = []
             if wandb.config.load_init: # if loading pretrained model, initialize the best val loss from previous run
                 val_losses.append(wandb.config.best_val_loss)
-            val_pearsons = [] # track pearsons per epoch
             patience_counter = 0 # simple patience counter for early stopping
             stop_criteria = False
             best_epoch = 0 # track epoch with best validation loss 
@@ -219,16 +228,15 @@ def main():
                 step_num = (wandb.config.num_epochs_to_start+epoch_i) * \
                             wandb.config.train_steps * GLOBAL_BATCH_SIZE
                 if epoch_i == 1: # if first epoch, build model which allows for weight loading
-                    print('building model')
-                    build_step(data_val_ho)
                     if wandb.config.load_init:
-                        model.load_weights(args.checkpoint_path + "/saved_model")
-                        print('built and loaded model')
-                    total_params = 0
-                    for k in model.trainable_variables:
-                        var = k.values[0]
-                        total_params += tf.size(var)
-                    print('total params: ' + str(total_params))
+                        status = ckpt.restore(tf.train.latest_checkpoint(checkpoint_dir))
+                        status.assert_existing_objects_matched()
+                        print('restored from checkpoint')
+                        skip_steps = (wandb.config.num_epochs_to_start) * \
+                                        wandb.config.train_steps * GLOBAL_BATCH_SIZE
+                        print('restoring iterator, skipping ' + str(skip_steps))
+                        for skip_step in range(skip_steps):
+                            next(train_human)
 
                 # main training step 
                 print('starting epoch_', str(epoch_i))
@@ -261,7 +269,6 @@ def main():
 
                 val_losses.append(val_loss)
                 wandb.log({'val_loss': val_loss}, step=step_num)
-                val_pearsons.append(metric_dict['ATAC_PearsonR'].result()['PearsonR'].numpy())
                 print('ATAC_pearsons: ' + str(metric_dict['ATAC_PearsonR'].result()['PearsonR'].numpy()))
                 print('ATAC_R2: ' + str(metric_dict['ATAC_R2'].result()['R2'].numpy()))
                 wandb.log({'ATAC_pearsons': metric_dict['ATAC_PearsonR'].result()['PearsonR'].numpy(),
@@ -279,18 +286,18 @@ def main():
                         training_utils.early_stopping(
                             current_val_loss=val_losses[-1],             # Last value from val_losses
                             logged_val_losses=val_losses,                # Full list of val_losses
-                            current_pearsons=val_pearsons[-1],           # Last value from val_pearsons
-                            logged_pearsons=val_pearsons,                # Full list of val_pearsons
                             current_epoch=epoch_i,                       # Current epoch number
                             best_epoch=best_epoch,                       # Best epoch so far
                             save_freq=args.savefreq,                     # Frequency of saving the model
                             patience=wandb.config.patience,              # Patience for early stopping
                             patience_counter=patience_counter,           # Current patience counter
                             min_delta=wandb.config.min_delta,            # Minimum change for early stopping
-                            model=model,                                 # Model to be used
-                            save_directory=wandb.config.model_save_dir,  # Directory for saving the model
-                            saved_model_basename=wandb.config.model_save_basename + "_" + wandb.run.name
                         )
+
+                if (epoch_i % args.savefreq) == 0:
+                    ckpt.step.assign_add(step_num)
+                    save_path = manager.save()
+                    print('saving model at: epoch ' + str(epoch_i))
 
                 print('patience counter at: ' + str(patience_counter))
                 for key, item in metric_dict.items(): # reset metrics for new epoch
@@ -299,15 +306,7 @@ def main():
                     print('early stopping at: epoch ' + str(epoch_i))
                     break
 
-            print('saving model at: epoch ' + str(epoch_i))
             print('best model was at: epoch ' + str(best_epoch))
-            model_save_path = os.path.join(
-                wandb.config.model_save_dir,
-                wandb.config.model_save_basename + "_" + wandb.run.name,
-                "final",
-                "saved_model"
-            )
-            model.save_weights(model_save_path)
 
 
     sweep_id = wandb.sweep(sweep_config, project=args.wandb_project)

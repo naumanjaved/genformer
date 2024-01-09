@@ -491,17 +491,12 @@ def return_distributed_iterators(gcs_path, gcs_path_ho, global_batch_size,
 
 def early_stopping(current_val_loss,
                    logged_val_losses,
-                   current_pearsons,
-                   logged_pearsons,
                    current_epoch,
                    best_epoch,
                    save_freq,
                    patience,
                    patience_counter,
-                   min_delta,
-                   model,
-                   save_directory,
-                   saved_model_basename):
+                   min_delta,):
     """early stopping function
     Args:
         current_val_loss: current epoch val loss
@@ -523,19 +518,11 @@ def early_stopping(current_val_loss,
         best_epoch: best epoch so far
     """
     print('check whether early stopping/save criteria met')
-    if (current_epoch % save_freq) == 0:
-        print('Saving model...')
-        model_name = save_directory + "/" + \
-                        saved_model_basename + "/iteration_" + \
-                            str(current_epoch) + "/saved_model"
-        model.save_weights(model_name)### check if min_delta satisfied
     try:
         best_loss = min(logged_val_losses[:-1])
-        best_pearsons=max(logged_pearsons[:-1])
 
     except ValueError:
         best_loss = current_val_loss
-        best_pearsons = current_pearsons
 
     stop_criteria = False
     ## if min delta satisfied then log loss
@@ -545,7 +532,6 @@ def early_stopping(current_val_loss,
         if patience_counter >= patience:
             stop_criteria=True
     else:
-
         best_epoch = np.argmin(logged_val_losses)
         ## save current model
 
