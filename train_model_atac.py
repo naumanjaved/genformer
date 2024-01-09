@@ -116,6 +116,7 @@ def main():
             date_string = f'{datetime.now():%Y-%m-%d %H:%M:%S%z}'
             date_string = date_string.replace(' ','_')
             run_name = run_name + "_" + date_string
+            wandb.run.name = run_name 
 
             # TFrecord dataset options
             options = tf.data.Options()
