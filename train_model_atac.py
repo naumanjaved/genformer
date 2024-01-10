@@ -73,7 +73,8 @@ def main():
                 'loss_type': {'values': [str(x) for x in args.loss_type.split(',')]},
                 'total_weight_loss': {'values': [float(x) for x in args.total_weight_loss.split(',')]},
                 'use_rot_emb': {'values':[parse_bool_str(x) for x in args.use_rot_emb.split(',')]},
-                'best_val_loss': {'values':[float(args.best_val_loss)]}
+                'best_val_loss': {'values':[float(args.best_val_loss)]},
+                'checkpoint_path': {'values':[args.checkpoint_path]}
                 }
     }
     '''
@@ -232,7 +233,7 @@ def main():
                             wandb.config.train_steps * GLOBAL_BATCH_SIZE
                 if epoch_i == 1: # if first epoch, build model which allows for weight loading
                     if wandb.config.load_init:
-                        status = ckpt.restore(tf.train.latest_checkpoint(checkpoint_dir))
+                        status = ckpt.restore(tf.train.latest_checkpoint(wandb.config.checkpoint_path))
                         status.assert_existing_objects_matched()
                         print('restored from checkpoint')
                         skip_steps = (wandb.config.num_epochs_to_start) * \
