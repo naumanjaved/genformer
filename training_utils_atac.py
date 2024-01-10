@@ -253,11 +253,11 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
         print('not using sequence')
         sequence = tf.zeros_like(sequence)
 
-    print('low level sequence masking')
-    sequence = mask_sequence(sequence,input_length, 
-                                bin_size=(output_res // 4), # mask 4 random bases per 128 bp
-                                kmer_size=1,
-                                seed=randomish_seed+12)
+    #print('low level sequence masking')
+    #sequence = mask_sequence(sequence,input_length, 
+    #                            bin_size=(output_res // 4), # mask 4 random bases per 128 bp
+    #                            kmer_size=1,
+    #                            seed=randomish_seed+12)
 
     return tf.cast(sequence,dtype=tf.bfloat16), \
                 tf.cast(tf.ensure_shape(masked_atac, [output_length_ATAC,1]),dtype=tf.bfloat16), \
