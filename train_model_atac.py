@@ -234,6 +234,7 @@ def main():
                 if epoch_i == 1: # if first epoch, build model which allows for weight loading
                     if wandb.config.load_init:
                         print(optimizer.lr)
+                        print(optimizer.iterations)
                         status = ckpt.restore(tf.train.latest_checkpoint(wandb.config.checkpoint_path))
                         status.assert_existing_objects_matched()
                         print('restored from checkpoint')
