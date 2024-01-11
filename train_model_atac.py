@@ -235,14 +235,17 @@ def main():
                     if wandb.config.load_init:
                         status = ckpt.restore(tf.train.latest_checkpoint(wandb.config.checkpoint_path))
                         status.assert_existing_objects_matched()
-                        print(optimizer.lr)
-                        print(optimizer.iterations)
+                        print(optimizer.lr.values[0])
+                        print(optimizer.iterations.values[0])
                         print('restored from checkpoint')
-                        skip_steps = wandb.config.num_epochs_to_start * \
-                                        wandb.config.train_steps
-                        print('restoring iterator, skipping ' + str(skip_steps))
-                        for skip_step in range(skip_steps):
-                            next(train_human)
+                        print('restore iterator to state from last checkpoint...')
+                        skip_steps=wandb.config.train_steps * wandb.config.num_epochs_to_start
+                        print('skipping ' + str(skip_steps) + ' steps...')
+                        @tf.function
+                        def iterate():
+                            for skip_step in range(skip_steps):
+                                next(train_human)
+                        iterate()
 
                 # main training step 
                 print('starting epoch_', str(epoch_i))

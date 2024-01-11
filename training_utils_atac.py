@@ -112,7 +112,7 @@ def return_train_val_functions(model, optimizer,
 
     return dist_train_step,dist_val_step, build_step, metric_dict
 
-
+@tf.function
 def deserialize_tr(serialized_example, g, use_motif_activity,
                    input_length = 524288, max_shift = 4, output_length_ATAC = 131072,
                    output_length = 4096, crop_size = 2, output_res = 128,
@@ -155,43 +155,33 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
     }
 
     ## here we need to set up some random numbers to achieve data augmentation
-    rev_comp = tf.math.round(g.uniform([], 0, 1)) # switch to govern reverse complementation 
     atac_mask_int = g.uniform([], 0, atac_corrupt_rate, dtype=tf.int32) # random increase ATAC masking w/ 1/atac_corrupt_rate prob. 
     randomish_seed = g.uniform([], 0, 100000000,dtype=tf.int32) # work-around to ensure random-ish stateless operations
-
+    shift = tf.random.stateless_uniform(shape=(),
+                      minval=0,
+                      maxval=max_shift,
+                      seed=[randomish_seed+1,randomish_seed+2],
+                      dtype=tf.int32)
+    
     rev_comp = tf.random.stateless_uniform(shape=[],
                                             minval=0,
                                             maxval=2,
                                             seed=[randomish_seed+5,randomish_seed+6], 
                                             dtype=tf.int32)
 
-    shift = tf.random.stateless_uniform(shape=(),
-                      minval=0,
-                      maxval=max_shift,
-                      seed=[randomish_seed+1,randomish_seed+2],
-                      dtype=tf.int32)
-
-    # determine random sequence shift for data augmentation
-    shift = g.uniform(shape=(), minval=0, maxval=max_shift, dtype=tf.int32)
-    for k in range(max_shift):
-        if k == shift:
-            seq_shift = k
-        else:
-            seq_shift=0
-    
     # parse out the actual data 
     data = tf.io.parse_example(serialized_example, feature_map)
 
     # sequence, get substring based on sequence shift, rev comp/mask/one hot 
-    sequence = one_hot(tf.strings.substr(data['sequence'], seq_shift,input_length))
+    sequence = one_hot(tf.strings.substr(data['sequence'], shift,input_length))
 
     # atac input, cast to float32 
-    atac = tf.ensure_shape(tf.io.parse_tensor(data['atac'], out_type=tf.float16), [output_length_ATAC,1])
-    atac = tf.cast(atac,dtype=tf.float32)
+    atac = tf.cast(tf.ensure_shape(tf.io.parse_tensor(data['atac'], out_type=tf.float16), 
+                                   [output_length_ATAC,1]),dtype=tf.float32)
     atac_target = atac ## store the target ATAC, as we will subsequently directly manipulate atac for masking
     # get peaks centers 
-    peaks_center = tf.ensure_shape(tf.io.parse_tensor(data['peaks_center'], out_type=tf.int32), [output_length])
-    peaks_center = tf.expand_dims(peaks_center,axis=1)
+    peaks_center = tf.expand_dims(tf.io.parse_tensor(data['peaks_center'], out_type=tf.int32), 
+                                  axis=1)
     peaks_c_crop = tf.slice(peaks_center, [crop_size,0], [output_length-2*crop_size,-1]) # crop at the outset 
     # TF activity, cast to float32 and expand dims to allow for processing by model input FC layers
     motif_activity = tf.ensure_shape(tf.io.parse_tensor(data['motif_activity'], out_type=tf.float16), [693])
@@ -260,11 +250,12 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
     #                            seed=randomish_seed+12)
 
     return tf.cast(sequence,dtype=tf.bfloat16), \
-                tf.cast(tf.ensure_shape(masked_atac, [output_length_ATAC,1]),dtype=tf.bfloat16), \
-                tf.cast(tf.ensure_shape(full_comb_mask_store, [output_length-crop_size*2,1]),dtype=tf.int32), \
-                tf.cast(tf.ensure_shape(atac_out,[output_length-crop_size*2,1]),dtype=tf.float32), \
-                tf.cast(tf.ensure_shape(motif_activity, [1,693]),dtype=tf.bfloat16)
+                tf.cast(masked_atac,dtype=tf.bfloat16), \
+                tf.cast(full_comb_mask_store,dtype=tf.int32), \
+                tf.cast(atac_out,dtype=tf.float32), \
+                tf.cast(motif_activity,dtype=tf.bfloat16)
 
+@tf.function
 def deserialize_val(serialized_example, g_val, use_motif_activity,
                    input_length = 524288, max_shift = 10, output_length_ATAC = 131072,
                    output_length = 4096, crop_size = 2, output_res = 128,
@@ -331,14 +322,9 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
         shape=(), minval=0, maxval=max_shift, 
         seed=[randomish_seed+1,randomish_seed+2], dtype=tf.int32)
 
-    for k in range(max_shift):
-        if k == shift:
-            seq_shift = k
-        else:
-            seq_shift=0
 
     # sequence, get substring based on sequence shift, one_hot
-    sequence = one_hot(tf.strings.substr(data['sequence'], seq_shift,input_length))
+    sequence = one_hot(tf.strings.substr(data['sequence'], shift,input_length))
 
     # motif activity, cast to float32 and expand dims to allow for processing by model input FC layers
     motif_activity = tf.ensure_shape(tf.io.parse_tensor(data['motif_activity'], out_type=tf.float16), [693])
@@ -400,10 +386,10 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
         sequence = tf.zeros_like(sequence)
 
     return tf.cast(sequence,dtype=tf.bfloat16), \
-                tf.cast(tf.ensure_shape(masked_atac, [output_length_ATAC,1]),dtype=tf.bfloat16), \
-                tf.cast(tf.ensure_shape(full_comb_mask_store, [output_length-crop_size*2,1]),dtype=tf.int32), \
-                tf.cast(tf.ensure_shape(atac_out,[output_length-crop_size*2,1]),dtype=tf.float32), \
-                tf.cast(tf.ensure_shape(motif_activity, [1,693]),dtype=tf.bfloat16)
+                tf.cast(masked_atac,dtype=tf.bfloat16), \
+                tf.cast(full_comb_mask_store,dtype=tf.int32), \
+                tf.cast(atac_out,dtype=tf.float32), \
+                tf.cast(motif_activity,dtype=tf.bfloat16)
 
 def return_dataset(gcs_path, split, batch, input_length, output_length_ATAC,
                    output_length, crop_size, output_res, max_shift, options,
