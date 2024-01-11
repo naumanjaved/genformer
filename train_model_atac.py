@@ -243,9 +243,9 @@ def main():
                         print('skipping ' + str(skip_steps) + ' steps...')
                         @tf.function
                         def iterate():
-                            for skip_step in range(skip_steps):
-                                next(train_human)
-                        iterate()
+                            next(train_human)
+                        for skip_step in range(skip_steps):
+                            iterate()
 
                 # main training step 
                 print('starting epoch_', str(epoch_i))
