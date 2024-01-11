@@ -233,10 +233,10 @@ def main():
                             wandb.config.train_steps * GLOBAL_BATCH_SIZE
                 if epoch_i == 1: # if first epoch, build model which allows for weight loading
                     if wandb.config.load_init:
-                        print(optimizer.lr)
-                        print(optimizer.iterations)
                         status = ckpt.restore(tf.train.latest_checkpoint(wandb.config.checkpoint_path))
                         status.assert_existing_objects_matched()
+                        print(optimizer.lr)
+                        print(optimizer.iterations)
                         print('restored from checkpoint')
                         skip_steps = (wandb.config.num_epochs_to_start) * \
                                         wandb.config.train_steps * GLOBAL_BATCH_SIZE
