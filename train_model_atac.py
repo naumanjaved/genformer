@@ -238,8 +238,8 @@ def main():
                         print(optimizer.lr)
                         print(optimizer.iterations)
                         print('restored from checkpoint')
-                        skip_steps = (wandb.config.num_epochs_to_start) * \
-                                        wandb.config.train_steps * GLOBAL_BATCH_SIZE
+                        skip_steps = wandb.config.num_epochs_to_start * \
+                                        wandb.config.train_steps
                         print('restoring iterator, skipping ' + str(skip_steps))
                         for skip_step in range(skip_steps):
                             next(train_human)
