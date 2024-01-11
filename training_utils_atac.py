@@ -406,7 +406,7 @@ def return_dataset(gcs_path, split, batch, input_length, output_length_ATAC,
         list_files = (tf.io.gfile.glob(os.path.join(gcs_path, split, wc)))
         files = tf.data.Dataset.list_files(list_files,seed=seed,shuffle=True)
 
-        dataset = tf.data.TFRecordDataset(files, compression_type='ZLIB', num_parallel_reads=num_parallel)
+        dataset = tf.data.TFRecordDataset(files, compression_type='ZLIB', num_parallel_reads=tf.data.AUTOTUNE)
         dataset = dataset.with_options(options)
 
         dataset = dataset.map(
@@ -420,14 +420,14 @@ def return_dataset(gcs_path, split, batch, input_length, output_length_ATAC,
                 log_atac, use_atac, use_seq,
                 atac_corrupt_rate),
             deterministic=False,
-            num_parallel_calls=num_parallel)
+            num_parallel_calls=tf.data.AUTOTUNE)
 
         return dataset.repeat((num_epoch*2)).batch(batch).prefetch(tf.data.AUTOTUNE)
 
     else:
         list_files = (tf.io.gfile.glob(os.path.join(gcs_path, split, wc)))
         files = tf.data.Dataset.list_files(list_files,shuffle=False)
-        dataset = tf.data.TFRecordDataset(files, compression_type='ZLIB', num_parallel_reads=num_parallel)
+        dataset = tf.data.TFRecordDataset(files, compression_type='ZLIB', num_parallel_reads=tf.data.AUTOTUNE)
         dataset = dataset.with_options(options)
         dataset = dataset.map(
             lambda record: deserialize_val(
@@ -438,7 +438,7 @@ def return_dataset(gcs_path, split, batch, input_length, output_length_ATAC,
                 atac_mask_dropout, random_mask_size,
                 log_atac, use_atac, use_seq),
             deterministic=False,
-            num_parallel_calls=num_parallel)
+            num_parallel_calls=tf.data.AUTOTUNE)
 
         return dataset.take(batch*validation_steps).batch(batch).repeat((num_epoch*2)).prefetch(tf.data.AUTOTUNE)
 
