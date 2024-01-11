@@ -396,7 +396,7 @@ def return_dataset(gcs_path, split, batch, input_length, output_length_ATAC,
                    num_parallel, num_epoch, atac_mask_dropout,
                    random_mask_size, log_atac, use_atac, use_seq, seed,
                    atac_corrupt_rate, validation_steps,
-                   use_motif_activity, g):
+                   use_motif_activity, g, skip_steps):
     """
     return a tf dataset object for given gcs path
     """
@@ -422,7 +422,7 @@ def return_dataset(gcs_path, split, batch, input_length, output_length_ATAC,
             deterministic=False,
             num_parallel_calls=tf.data.AUTOTUNE)
 
-        return dataset.repeat((num_epoch*2)).batch(batch).prefetch(tf.data.AUTOTUNE)
+        return dataset.skip(skip_steps).repeat((num_epoch*2)).batch(batch).prefetch(tf.data.AUTOTUNE)
 
     else:
         list_files = (tf.io.gfile.glob(os.path.join(gcs_path, split, wc)))
@@ -451,21 +451,21 @@ def return_distributed_iterators(gcs_path, gcs_path_ho, global_batch_size,
                                  random_mask_size,
                                  log_atac, use_atac, use_seq, seed,seed_val,
                                  atac_corrupt_rate, 
-                                 validation_steps, use_motif_activity, g, g_val):
+                                 validation_steps, use_motif_activity, g, g_val, skip_steps):
 
     tr_data = return_dataset(gcs_path, "train", global_batch_size, input_length,
                              output_length_ATAC, output_length, crop_size,
                              output_res, max_shift, options, num_parallel_calls,
                              num_epoch, atac_mask_dropout, random_mask_size,
                              log_atac, use_atac, use_seq, seed,
-                             atac_corrupt_rate, validation_steps, use_motif_activity, g)
+                             atac_corrupt_rate, validation_steps, use_motif_activity, g, skip_steps)
 
     val_data_ho = return_dataset(gcs_path_ho, "valid", global_batch_size, input_length,
                                  output_length_ATAC, output_length, crop_size,
                                  output_res, max_shift, options_val, num_parallel_calls, num_epoch,
                                  atac_mask_dropout_val, random_mask_size, log_atac,
                                  use_atac, use_seq, seed_val, atac_corrupt_rate,
-                                 validation_steps, use_motif_activity, g_val)
+                                 validation_steps, use_motif_activity, g_val, skip_steps)
 
     val_dist_ho=strategy.experimental_distribute_dataset(val_data_ho)
     val_data_ho_it = iter(val_dist_ho)

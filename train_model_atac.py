@@ -144,6 +144,8 @@ def main():
                                 allow_val_change=True)
 
             # create the dataset iterators, one for training, one for holdout validation
+            skip_steps = wandb.config.train_steps * wandb.config.num_epochs_to_start             
+
             train_human, data_val_ho = \
                     training_utils.return_distributed_iterators(wandb.config.gcs_path, wandb.config.gcs_path_holdout,
                                                                 GLOBAL_BATCH_SIZE, wandb.config.input_length,
@@ -156,9 +158,11 @@ def main():
                                                                 wandb.config.use_atac, wandb.config.use_seq, wandb.config.seed,
                                                                 wandb.config.val_data_seed, wandb.config.atac_corrupt_rate,
                                                                 wandb.config.val_steps_ho, wandb.config.use_motif_activity,
-                                                                g, g_val)
+                                                                g, g_val, skip_steps)
 
             print('created dataset iterators')
+            if wandb.config.load_init:
+                print('skipped ' + str(skip_steps) + ' steps when creating iterator')
             print(wandb.config)
 
             # initialize model
@@ -238,14 +242,6 @@ def main():
                         print(optimizer.lr.values[0])
                         print(optimizer.iterations.values[0])
                         print('restored from checkpoint')
-                        print('restore iterator to state from last checkpoint...')
-                        skip_steps=wandb.config.train_steps * wandb.config.num_epochs_to_start
-                        print('skipping ' + str(skip_steps) + ' steps...')
-                        @tf.function
-                        def iterate():
-                            next(train_human)
-                        for skip_step in range(skip_steps):
-                            iterate()
 
                 # main training step 
                 print('starting epoch_', str(epoch_i))
