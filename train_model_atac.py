@@ -144,7 +144,7 @@ def main():
                                 allow_val_change=True)
 
             # create the dataset iterators, one for training, one for holdout validation
-            skip_steps = wandb.config.train_steps * wandb.config.num_epochs_to_start             
+            skip_steps = wandb.config.train_steps * wandb.config.num_epochs_to_start * GLOBAL_BATCH_SIZE          
 
             train_human, data_val_ho = \
                     training_utils.return_distributed_iterators(wandb.config.gcs_path, wandb.config.gcs_path_holdout,
@@ -162,7 +162,7 @@ def main():
 
             print('created dataset iterators')
             if wandb.config.load_init:
-                print('skipped ' + str(skip_steps) + ' steps when creating iterator')
+                print('skipped ' + str(skip_steps) + ' examples when creating iterator')
             print(wandb.config)
 
             # initialize model
