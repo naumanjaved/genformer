@@ -16,6 +16,7 @@ import scipy.ndimage
 from src.losses import poisson_multinomial
 import numpy as np
 import itertools
+import random
 
 tf.keras.backend.set_floatx('float32')
 
