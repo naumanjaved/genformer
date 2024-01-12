@@ -69,7 +69,6 @@ def main():
                 'val_data_seed': {'values':[args.val_data_seed]},
                 'atac_corrupt_rate': {'values': [int(x) for x in args.atac_corrupt_rate.split(',')]},
                 'use_motif_activity': {'values': [parse_bool_str(x) for x in args.use_motif_activity.split(',')]},
-                'num_epochs_to_start': {'values': [int(x) for x in args.num_epochs_to_start.split(',')]},
                 'loss_type': {'values': [str(x) for x in args.loss_type.split(',')]},
                 'total_weight_loss': {'values': [float(x) for x in args.total_weight_loss.split(',')]},
                 'use_rot_emb': {'values':[parse_bool_str(x) for x in args.use_rot_emb.split(',')]},
@@ -148,15 +147,13 @@ def main():
             wandb.config.update({"total_steps": 1 + (34021 * 16 // GLOBAL_BATCH_SIZE)},
                                 allow_val_change=True)
 
-            # create the dataset iterators, one for training, one for holdout validation
-            skip_steps = wandb.config.train_steps * wandb.config.num_epochs_to_start * GLOBAL_BATCH_SIZE          
-
+            # create the dataset iterators, one for training, one for holdout validation  
             train_human_its, data_val_ho = \
                     training_utils.return_distributed_iterators(wandb.config.gcs_path, wandb.config.gcs_path_holdout,
                                                                 GLOBAL_BATCH_SIZE, wandb.config.input_length,
                                                                 wandb.config.max_shift, wandb.config.output_length_ATAC,
                                                                 wandb.config.output_length, wandb.config.crop_size,
-                                                                wandb.config.output_res, args.num_parallel, args.num_epochs,
+                                                                wandb.config.output_res, args.num_parallel, wandb.config.num_epochs,
                                                                 strategy, options,options_val, wandb.config.atac_mask_dropout,
                                                                 wandb.config.atac_mask_dropout_val,
                                                                 wandb.config.random_mask_size, wandb.config.log_atac,
