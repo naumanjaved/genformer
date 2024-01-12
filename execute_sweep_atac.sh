@@ -1,7 +1,7 @@
 #!/bin/bash -l
 
 python3 train_model_atac.py \
-            --tpu_name="pod1" \
+            --tpu_name="pod10" \
             --tpu_zone="us-central1-a" \
             --wandb_project="atac_pretraining" \
             --wandb_user="njaved" \
@@ -15,8 +15,6 @@ python3 train_model_atac.py \
             --final_output_length=4092 \
             --max_shift=4 \
             --batch_size=4 \
-            --num_epochs=50 \
-            --train_examples=500000 \
             --val_examples_ho=38880 \
             --BN_momentum=0.90 \
             --patience=50 \
@@ -28,7 +26,7 @@ python3 train_model_atac.py \
             --decay_frac="0.10" \
             --gradient_clip="1.0" \
             --epsilon=1.0e-8 \
-            --num_transformer_layers="8" \
+            --num_transformer_layers="12" \
             --dropout_rate="0.20" \
             --pointwise_dropout_rate="0.10" \
             --num_heads="4" \
@@ -37,7 +35,7 @@ python3 train_model_atac.py \
             --savefreq=1 \
             --load_init="False" \
             --rectify="True" \
-            --filter_list_seq="512,512,768,768,1024,1024" \
+            --filter_list_seq="384,384,640,640,896,896" \
             --filter_list_atac="32,64" \
             --atac_mask_dropout=0.15 \
             --atac_mask_dropout_val=0.15 \
@@ -50,7 +48,6 @@ python3 train_model_atac.py \
             --val_data_seed=25 \
             --atac_corrupt_rate="15" \
             --use_motif_activity="True" \
-            --num_epochs_to_start="0" \
             --total_weight_loss="0.15" \
             --use_rot_emb="True" \
             --best_val_loss=100.0 \

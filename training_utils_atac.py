@@ -101,16 +101,7 @@ def return_train_val_functions(model, optimizer,
         metric_dict['ATAC_PearsonR'].update_state(target_atac, output_atac)
         metric_dict['ATAC_R2'].update_state(target_atac, output_atac)
 
-    def build_step(iterator): # just to build the model
-        @tf.function(reduce_retracing=True)
-        def val_step(inputs):
-            sequence,atac,mask,target,motif_activity =inputs
-            input_tuple = sequence,atac,motif_activity
-            model(input_tuple, training=False)
-
-        strategy.run(val_step, args=(next(iterator),))
-
-    return dist_train_step,dist_val_step, build_step, metric_dict
+    return dist_train_step,dist_val_step,metric_dict
 
 @tf.function
 def deserialize_tr(serialized_example, g, use_motif_activity,
@@ -396,33 +387,39 @@ def return_dataset(gcs_path, split, batch, input_length, output_length_ATAC,
                    num_parallel, num_epoch, atac_mask_dropout,
                    random_mask_size, log_atac, use_atac, use_seq, seed,
                    atac_corrupt_rate, validation_steps,
-                   use_motif_activity, g, skip_steps):
+                   use_motif_activity, g):
     """
     return a tf dataset object for given gcs path
     """
     wc = "*.tfr"
 
     if split == 'train':
-        list_files = (tf.io.gfile.glob(os.path.join(gcs_path, split, wc)))
-        files = tf.data.Dataset.list_files(list_files,seed=seed,shuffle=True)
+        list_files = tf.io.gfile.glob(os.path.join(gcs_path, split, wc))
+        random.Random(seed).shuffle(list_files)
+        # Divide list_files into smaller subsets
+        subset_size = 16 
+        files_subsets = [list_files[i:i + subset_size] for i in range(0, len(list_files), subset_size)]
+        iterators_list = []
+        for files in files_subsets:
+            dataset = tf.data.Dataset.list_files(files,seed=seed)
+            dataset = tf.data.TFRecordDataset(dataset, compression_type='ZLIB', num_parallel_reads=tf.data.AUTOTUNE)
+            dataset = dataset.with_options(options)
 
-        dataset = tf.data.TFRecordDataset(files, compression_type='ZLIB', num_parallel_reads=tf.data.AUTOTUNE)
-        dataset = dataset.with_options(options)
+            dataset = dataset.map(
+                lambda record: deserialize_tr(
+                    record,
+                    g, use_motif_activity,
+                    input_length, max_shift,
+                    output_length_ATAC, output_length,
+                    crop_size, output_res,
+                    atac_mask_dropout, random_mask_size,
+                    log_atac, use_atac, use_seq,
+                    atac_corrupt_rate),
+                deterministic=False,
+                num_parallel_calls=tf.data.AUTOTUNE)
 
-        dataset = dataset.map(
-            lambda record: deserialize_tr(
-                record,
-                g, use_motif_activity,
-                input_length, max_shift,
-                output_length_ATAC, output_length,
-                crop_size, output_res,
-                atac_mask_dropout, random_mask_size,
-                log_atac, use_atac, use_seq,
-                atac_corrupt_rate),
-            deterministic=False,
-            num_parallel_calls=tf.data.AUTOTUNE)
-
-        return dataset.skip(skip_steps).repeat((num_epoch*2)).batch(batch).prefetch(tf.data.AUTOTUNE)
+            iterators_list.append(dataset.repeat(2).batch(batch).prefetch(tf.data.AUTOTUNE))
+        return iterators_list
 
     else:
         list_files = (tf.io.gfile.glob(os.path.join(gcs_path, split, wc)))
@@ -451,35 +448,36 @@ def return_distributed_iterators(gcs_path, gcs_path_ho, global_batch_size,
                                  random_mask_size,
                                  log_atac, use_atac, use_seq, seed,seed_val,
                                  atac_corrupt_rate, 
-                                 validation_steps, use_motif_activity, g, g_val, skip_steps):
+                                 validation_steps, use_motif_activity, g, g_val):
 
-    tr_data = return_dataset(gcs_path, "train", global_batch_size, input_length,
+    tr_iterators = return_dataset(gcs_path, "train", global_batch_size, input_length,
                              output_length_ATAC, output_length, crop_size,
                              output_res, max_shift, options, num_parallel_calls,
                              num_epoch, atac_mask_dropout, random_mask_size,
                              log_atac, use_atac, use_seq, seed,
-                             atac_corrupt_rate, validation_steps, use_motif_activity, g, skip_steps)
+                             atac_corrupt_rate, validation_steps, use_motif_activity, g)
 
     val_data_ho = return_dataset(gcs_path_ho, "valid", global_batch_size, input_length,
                                  output_length_ATAC, output_length, crop_size,
                                  output_res, max_shift, options_val, num_parallel_calls, num_epoch,
                                  atac_mask_dropout_val, random_mask_size, log_atac,
                                  use_atac, use_seq, seed_val, atac_corrupt_rate,
-                                 validation_steps, use_motif_activity, g_val, skip_steps)
+                                 validation_steps, use_motif_activity, g_val)
 
     val_dist_ho=strategy.experimental_distribute_dataset(val_data_ho)
     val_data_ho_it = iter(val_dist_ho)
 
-    train_dist = strategy.experimental_distribute_dataset(tr_data)
-    tr_data_it = iter(train_dist)
+    dist_iters_list=[]
+    for it in tr_iterators:
+        tr_dist = strategy.experimental_distribute_dataset(it)
+        tr_data_it = iter(tr_dist)
+        dist_iters_list.append(tr_data_it)
 
-    return tr_data_it, val_data_ho_it
+    return dist_iters_list, val_data_ho_it
 
 def early_stopping(current_val_loss,
                    logged_val_losses,
-                   current_epoch,
                    best_epoch,
-                   save_freq,
                    patience,
                    patience_counter,
                    min_delta,):
@@ -538,8 +536,6 @@ def parse_args(parser):
     parser.add_argument('--gcs_path_holdout', help='google bucket containing holdout data')
     parser.add_argument('--num_parallel', type=int, default=multiprocessing.cpu_count(), help='thread count for tensorflow record loading')
     parser.add_argument('--batch_size', default=1, type=int, help='batch_size')
-    parser.add_argument('--num_epochs', type=int, help='num_epochs')
-    parser.add_argument('--train_examples', type=int)
     parser.add_argument('--val_examples_ho', type=int, help='val_examples_ho')
     parser.add_argument('--patience', type=int, help='patience for early stopping')
     parser.add_argument('--min_delta', type=float, help='min_delta for early stopping')
@@ -583,8 +579,6 @@ def parse_args(parser):
     parser.add_argument('--atac_corrupt_rate', type=str,default="20",
                         help= 'increase atac corrupt by 3x with 1.0/atac_corrupt_rate probability')
     parser.add_argument('--use_motif_activity', type=str, default="False", help= 'use_motif_activity')
-    parser.add_argument('--num_epochs_to_start', type=str, default="0",
-                        help= 'num_epochs_to_start')
     parser.add_argument('--loss_type', type=str, default="poisson_multinomial", help= 'loss_type')
     parser.add_argument('--total_weight_loss',type=str, default="0.15", help= 'total_weight_loss')
     parser.add_argument('--use_rot_emb',type=str, default="True", help= 'use_rot_emb')

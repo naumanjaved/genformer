@@ -90,14 +90,30 @@ def main():
 
         with strategy.scope(): ## keep remainder of parameter initialization within TPU/GPU strategy scope
             config_defaults = {"lr_base": 0.01 }### will be overwritten by sweep config
+            mod_run_name = '_'.join([args.model_save_basename,
+                                     str(args.input_length / 1000)[:4].rstrip('.') + 'k',
+                                 'LR-' + str(args.lr_base),
+                                 'C-' + args.filter_list_seq.replace(',','_'),
+                                 'T-' + str(args.num_transformer_layers),
+                                 'motif-' + str(args.use_motif_activity)])
+            date_string = f'{datetime.now():%Y-%m-%d %H:%M:%S%z}'
+            date_string = date_string.replace(' ','_')
+            date_string = f'{datetime.now():%Y-%m-%d %H:%M:%S%z}'
+            date_string = date_string.replace(' ','_')
+            
+            
             wandb.init(config=config_defaults,
                        project= args.wandb_project,
-                       entity=args.wandb_user)
+                       id=mod_run_name + "_" + str(args.seed),
+                       name = mod_run_name + "_" + str(args.seed),
+                       entity=args.wandb_user,resume="allow")
+            
+            wandb.run.name = mod_run_name + "_" + str(args.seed)
+
             wandb.config.tpu=args.tpu_name
             wandb.config.gcs_path=args.gcs_path
             wandb.config.gcs_path_holdout=args.gcs_path_holdout
-            wandb.config.num_epochs=args.num_epochs
-            wandb.config.train_examples=args.train_examples
+            wandb.config.num_epochs=44 ## epoch here is really just a group of 16 files(there are 700 total)
             wandb.config.val_examples_ho=args.val_examples_ho
             wandb.config.batch_size=args.batch_size
             wandb.config.patience=args.patience
@@ -107,17 +123,6 @@ def main():
             wandb.config.max_shift=args.max_shift
 
             wandb.config.crop_size = (wandb.config.output_length - wandb.config.final_output_length) // 2
-            run_name = '_'.join([str(int(wandb.config.input_length) / 1000)[:4].rstrip('.') + 'k',
-                                 'LR-' + str(wandb.config.lr_base),
-                                 'C-' + '_'.join([str(x) for x in wandb.config.filter_list_seq]),
-                                 'T-' + str(wandb.config.num_transformer_layers),
-                                 'motif-' + str(wandb.config.use_motif_activity)])
-            date_string = f'{datetime.now():%Y-%m-%d %H:%M:%S%z}'
-            date_string = date_string.replace(' ','_')
-            date_string = f'{datetime.now():%Y-%m-%d %H:%M:%S%z}'
-            date_string = date_string.replace(' ','_')
-            run_name = run_name + "_" + date_string
-            wandb.run.name = run_name 
 
             # TFrecord dataset options
             options = tf.data.Options()
@@ -136,17 +141,17 @@ def main():
             GLOBAL_BATCH_SIZE = BATCH_SIZE_PER_REPLICA*NUM_REPLICAS # num total examples per step across all replicas
             print('global batch size:', GLOBAL_BATCH_SIZE)
 
-            wandb.config.update({"train_steps": wandb.config.train_examples // (GLOBAL_BATCH_SIZE)},
+            wandb.config.update({"train_steps": 1 + (34021 * 16 // (GLOBAL_BATCH_SIZE))},
                                 allow_val_change=True)
             wandb.config.update({"val_steps_ho" : wandb.config.val_examples_ho // GLOBAL_BATCH_SIZE},
                                 allow_val_change=True)
-            wandb.config.update({"total_steps": wandb.config.train_examples // GLOBAL_BATCH_SIZE},
+            wandb.config.update({"total_steps": 1 + (34021 * 16 // GLOBAL_BATCH_SIZE)},
                                 allow_val_change=True)
 
             # create the dataset iterators, one for training, one for holdout validation
             skip_steps = wandb.config.train_steps * wandb.config.num_epochs_to_start * GLOBAL_BATCH_SIZE          
 
-            train_human, data_val_ho = \
+            train_human_its, data_val_ho = \
                     training_utils.return_distributed_iterators(wandb.config.gcs_path, wandb.config.gcs_path_holdout,
                                                                 GLOBAL_BATCH_SIZE, wandb.config.input_length,
                                                                 wandb.config.max_shift, wandb.config.output_length_ATAC,
@@ -158,11 +163,9 @@ def main():
                                                                 wandb.config.use_atac, wandb.config.use_seq, wandb.config.seed,
                                                                 wandb.config.val_data_seed, wandb.config.atac_corrupt_rate,
                                                                 wandb.config.val_steps_ho, wandb.config.use_motif_activity,
-                                                                g, g_val, skip_steps)
+                                                                g, g_val)
 
             print('created dataset iterators')
-            if wandb.config.load_init:
-                print('skipped ' + str(skip_steps) + ' examples when creating iterator')
             print(wandb.config)
 
             # initialize model
@@ -203,18 +206,22 @@ def main():
                                                             'BN', 'LN', 'LayerNorm','BatchNorm'])
             metric_dict = {} # initialize dictionary to store metrics
 
-            ckpt = tf.train.Checkpoint(step=tf.Variable(1),optimizer=optimizer, 
-                                                            model=model)
-            checkpoint_dir = wandb.config.model_save_dir + \
-                                '/' + wandb.config.model_save_basename + \
-                                    "_" + wandb.run.name
+            batch_num = tf.Variable(0, name="batch_num")
+            ckpt = tf.train.Checkpoint(batch_num=batch_num,
+                                       optimizer=optimizer,
+                                       model=model)
             
-            manager = tf.train.CheckpointManager(ckpt, 
+            checkpoint_dir = os.path.join(wandb.config.model_save_dir, wandb.run.name)
+            if wandb.config.load_init:
+                checkpoint_dir = wandb.config.checkpoint_path
+                wandb.run.name = wandb.config.checkpoint_path.split('/')[-1]
+
+            manager = tf.train.CheckpointManager(ckpt,
                                                  directory=checkpoint_dir,
                                                  max_to_keep=10)
 
             # initialize functions for training and validation steps
-            train_step, val_step, build_step, metric_dict = \
+            train_step, val_step, metric_dict = \
                 training_utils.return_train_val_functions(
                     model=model,
                     optimizer=optimizer,
@@ -232,22 +239,30 @@ def main():
             stop_criteria = False
             best_epoch = 0 # track epoch with best validation loss 
 
-            for epoch_i in range(1, wandb.config.num_epochs+1):
-                step_num = (wandb.config.num_epochs_to_start+epoch_i) * \
-                            wandb.config.train_steps * GLOBAL_BATCH_SIZE
-                if epoch_i == 1: # if first epoch, build model which allows for weight loading
-                    if wandb.config.load_init:
-                        status = ckpt.restore(tf.train.latest_checkpoint(wandb.config.checkpoint_path))
-                        status.assert_existing_objects_matched()
-                        print(optimizer.lr.values[0])
-                        print(optimizer.iterations.values[0])
-                        print('restored from checkpoint')
+            wandb.config.update({"num_epochs_to_start": 0}, allow_val_change=True)
+            if wandb.config.load_init:
+                status = ckpt.restore(tf.train.latest_checkpoint(wandb.config.checkpoint_path))
+                status.assert_existing_objects_matched()
+                print(optimizer.lr.values[0])
+                print('restored from checkpoint')
+                print('restart training at epoch: ' + str(1+ batch_num.numpy()))
+                print('restart at data batch: ' + str(batch_num.numpy()))
+                wandb.config.update({"num_epochs_to_start": batch_num.numpy()}, 
+                                    allow_val_change=True)
+            
+            starting_point = wandb.config.num_epochs_to_start % len(train_human_its)
+            local_epoch = 0
 
-                # main training step 
-                print('starting epoch_', str(epoch_i))
+            for epoch_i in range(starting_point, len(train_human_its) + 1):
+                step_num = (wandb.config.num_epochs_to_start + local_epoch) * \
+                                wandb.config.train_steps * GLOBAL_BATCH_SIZE
+                            
+                print('starting epoch_' + str(1 + wandb.config.num_epochs_to_start + local_epoch) + \
+                          ' at step: ' + str(step_num))
                 start = time.time()
-                for step in range(wandb.config.train_steps):
-                    strategy.run(train_step, args=(next(train_human),))
+
+                for k in range(wandb.config.train_steps):
+                    strategy.run(train_step, args=(next(train_human_its[epoch_i]),))
 
                 train_loss = metric_dict['train_loss'].result().numpy() * NUM_REPLICAS # multiply by NUM_REPLICAS to get total loss
                 print('train_loss: ' + str(train_loss))
@@ -259,7 +274,7 @@ def main():
                           step=step_num)
                 duration = (time.time() - start) / 60.
 
-                print('completed epoch ' + str(epoch_i) + ' - duration(mins): ' + str(duration))
+                print('completed epoch ' + str(1 + wandb.config.num_epochs_to_start + local_epoch) + ' - duration(mins): ' + str(duration))
 
                 # main validation step:
                 # - run the validation loop
@@ -281,32 +296,31 @@ def main():
                           step=step_num)
 
                 duration = (time.time() - start) / 60.
-                print('completed epoch ' + str(epoch_i) + ' validation - duration(mins): ' + str(duration))
+                print('completed epoch ' + str(local_epoch + 1 + wandb.config.num_epochs_to_start) + ' validation - duration(mins): ' + str(duration))
 
                 # Start early stopping checks:
                 # - After epoch one if not loading from a checkpoint
                 # - Immediately (epoch 0) if loading from a checkpoint, using the provided best loss
-                if (epoch_i > 0 and not wandb.config.load_init) or wandb.config.load_init: 
+                if ((wandb.config.num_epochs_to_start+epoch_i+1) > 0 and (not wandb.config.load_init)) or wandb.config.load_init:
                     stop_criteria, patience_counter, best_epoch = \
                         training_utils.early_stopping(
                             current_val_loss=val_losses[-1],             # Last value from val_losses
                             logged_val_losses=val_losses,                # Full list of val_losses
-                            current_epoch=epoch_i,                       # Current epoch number
                             best_epoch=best_epoch,                       # Best epoch so far
-                            save_freq=args.savefreq,                     # Frequency of saving the model
                             patience=wandb.config.patience,              # Patience for early stopping
                             patience_counter=patience_counter,           # Current patience counter
                             min_delta=wandb.config.min_delta,            # Minimum change for early stopping
                         )
-
-                if (epoch_i % args.savefreq) == 0:
-                    ckpt.step.assign_add(step_num)
+                    print('patience counter at: ' + str(patience_counter))
+                ckpt.batch_num.assign_add(1)
+                if ((epoch_i+1) % args.savefreq) == 0:
                     save_path = manager.save()
-                    print('saving model at: epoch ' + str(epoch_i))
+                    print('saving model after: epoch ' + str(epoch_i + 1 + wandb.config.num_epochs_to_start))
+                    print('corresponds to stop point: start at data batch ' + str(epoch_i + starting_point))
 
-                print('patience counter at: ' + str(patience_counter))
                 for key, item in metric_dict.items(): # reset metrics for new epoch
                     item.reset_state()
+                local_epoch += 1
                 if stop_criteria:
                     print('early stopping at: epoch ' + str(epoch_i))
                     break
