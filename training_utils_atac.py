@@ -418,7 +418,7 @@ def return_dataset(gcs_path, split, batch, input_length, output_length_ATAC,
                 deterministic=False,
                 num_parallel_calls=tf.data.AUTOTUNE)
 
-            iterators_list.append(dataset.repeat(2).batch(batch).prefetch(tf.data.AUTOTUNE))
+            iterators_list.append(dataset.repeat(3).batch(batch).prefetch(tf.data.AUTOTUNE))
         return iterators_list
 
     else:

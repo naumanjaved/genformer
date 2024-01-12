@@ -161,6 +161,8 @@ def main():
                                                                 wandb.config.val_data_seed, wandb.config.atac_corrupt_rate,
                                                                 wandb.config.val_steps_ho, wandb.config.use_motif_activity,
                                                                 g, g_val)
+            
+            train_human_its_mult = train_human_its * 3
 
             print('created dataset iterators')
             print(wandb.config)
@@ -247,10 +249,10 @@ def main():
                 wandb.config.update({"num_epochs_to_start": batch_num.numpy()}, 
                                     allow_val_change=True)
             
-            starting_point = wandb.config.num_epochs_to_start % len(train_human_its)
+            starting_point = wandb.config.num_epochs_to_start % len(train_human_its_mult)
             local_epoch = 0
 
-            for epoch_i in range(starting_point, len(train_human_its) + 1):
+            for epoch_i in range(starting_point, len(train_human_its_mult) + 1):
                 step_num = (wandb.config.num_epochs_to_start + local_epoch) * \
                                 wandb.config.train_steps * GLOBAL_BATCH_SIZE
                             
@@ -259,7 +261,7 @@ def main():
                 start = time.time()
 
                 for k in range(wandb.config.train_steps):
-                    strategy.run(train_step, args=(next(train_human_its[epoch_i]),))
+                    strategy.run(train_step, args=(next(train_human_its_mult[epoch_i]),))
 
                 train_loss = metric_dict['train_loss'].result().numpy() * NUM_REPLICAS # multiply by NUM_REPLICAS to get total loss
                 print('train_loss: ' + str(train_loss))
