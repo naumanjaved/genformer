@@ -1,5 +1,4 @@
 import os
-import matplotlib.pyplot as plt
 import numpy as np
 import multiprocessing
 os.environ['TF_ENABLE_EAGER_CLIENT_STREAMING_ENQUEUE']='False'
@@ -7,7 +6,6 @@ import tensorflow as tf
 from tensorflow import strings as tfs
 import src.metrics as metrics 
 import src.schedulers
-import pandas as pd
 import src.utils
 import seaborn as sns
 from scipy import stats
