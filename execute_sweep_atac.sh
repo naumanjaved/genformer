@@ -2,7 +2,7 @@
 
 python3 train_model_atac.py \
             --tpu_name="pod10" \
-            --tpu_zone="us-central1-a" \
+            --tpu_zone="europe-west4-a" \
             --wandb_project="atac_pretraining" \
             --wandb_user="njaved" \
             --wandb_sweep_name="atac_pretraining" \
@@ -26,7 +26,7 @@ python3 train_model_atac.py \
             --decay_frac="0.10" \
             --gradient_clip="1.0" \
             --epsilon=1.0e-8 \
-            --num_transformer_layers="12" \
+            --num_transformer_layers="10" \
             --dropout_rate="0.20" \
             --pointwise_dropout_rate="0.10" \
             --num_heads="4" \
@@ -35,10 +35,10 @@ python3 train_model_atac.py \
             --savefreq=1 \
             --load_init="False" \
             --rectify="True" \
-            --filter_list_seq="384,384,640,640,896,896" \
+            --filter_list_seq="512,512,768,768,1024,1024" \
             --filter_list_atac="32,64" \
-            --atac_mask_dropout=0.15 \
-            --atac_mask_dropout_val=0.15 \
+            --atac_mask_dropout=0.10 \
+            --atac_mask_dropout_val=0.10 \
             --log_atac="False" \
             --random_mask_size="1536" \
             --use_atac="True" \
@@ -46,7 +46,7 @@ python3 train_model_atac.py \
             --use_seq="True" \
             --seed=25 \
             --val_data_seed=25 \
-            --atac_corrupt_rate="15" \
+            --atac_corrupt_rate="25" \
             --use_motif_activity="True" \
             --total_weight_loss="0.15" \
             --use_rot_emb="True" \

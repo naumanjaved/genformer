@@ -201,7 +201,7 @@ class FFN(kl.Layer):
         self.ffn_widening = 2
         self.ffn_dropout = dropout_rate
         self.load_init=load_init
-        self.FFN_LN_gamma_init=None,
+        self.FFN_LN_gamma_init=FFN_LN_gamma_init,
         self.FFN_LN_beta_init=FFN_LN_beta_init
         self.FFN_kernel1_init=FFN_kernel1_init
         self.FFN_bias1_init=FFN_bias1_init
@@ -210,8 +210,8 @@ class FFN(kl.Layer):
 
 
         self.FFN_layer_norm = layer_norm_fp32(epsilon=1e-05,
-                                                  beta_initializer="zeros",
-                                                  gamma_initializer="ones")
+                                                  beta_initializer=FFN_LN_beta_init if self.load_init else "zeros",
+                                                  gamma_initializer=FFN_LN_gamma_init if self.load_init else "ones")
         self.FFN_dense_wide = kl.Dense(self.ffn_channels*self.ffn_widening,
                                        activation='linear',
                                        kernel_initializer=FFN_kernel1_init if self.load_init else 'lecun_normal',
@@ -512,14 +512,12 @@ class Performer_Encoder(kl.Layer):
 
     def call(self, x, training=None, **kwargs):
         att_matrices={}
-
         for idx,layer in enumerate(self.layers):
             if self.use_rot_emb is True:
-                x += self.pos_emb(x)
+                #x += self.pos_emb(x) # for some reason this is in the lucidrains implementation..
                 rpe = self.layer_pos_emb(x)
                 x,k_prime,q_prime = layer(x, rpe=rpe, training=training)
                 att_matrices['layer_' + str(idx)] = (k_prime,q_prime)
-
 
         if self.norm:
             x = self.layer_norm(x)
@@ -619,3 +617,4 @@ class TargetLengthCrop1D(kl.Layer):
             return inputs
         else:
             return inputs[..., trim:-trim, :]
+
