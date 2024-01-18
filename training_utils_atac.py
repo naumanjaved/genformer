@@ -100,7 +100,17 @@ def return_train_val_functions(model, optimizer,
         metric_dict['ATAC_PearsonR'].update_state(target_atac, output_atac)
         metric_dict['ATAC_R2'].update_state(target_atac, output_atac)
 
-    return dist_train_step,dist_val_step,metric_dict
+    @tf.function
+    def build_step(iterator): # just to build the model
+        @tf.function(reduce_retracing=True)
+        def val_step(inputs):
+            sequence,atac,mask,target,motif_activity =inputs
+            input_tuple = sequence,atac,motif_activity
+            model(input_tuple, training=False)
+
+        strategy.run(val_step, args=(next(iterator),))
+
+    return dist_train_step,dist_val_step,build_step,metric_dict
 
 @tf.function
 def deserialize_tr(serialized_example, g, use_motif_activity,

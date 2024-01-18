@@ -199,7 +199,7 @@ def main():
                                          decay_schedule_fn=scheduler)
             optimizer = tf.keras.optimizers.AdamW(learning_rate=scheduler, 
                                                     epsilon=wandb.config.epsilon,
-                                                    weight_decay=1.0e-05,
+                                                    weight_decay=1.0e-06,
                                                     global_clipnorm=wandb.config.gradient_clip)
             optimizer.exclude_from_weight_decay(var_names = ['bias', 'batch_norm','layer_norm', 
                                                             'BN', 'LN', 'LayerNorm','BatchNorm'])
@@ -220,7 +220,7 @@ def main():
                                                  max_to_keep=10)
 
             # initialize functions for training and validation steps
-            train_step, val_step, metric_dict = \
+            train_step, val_step, build_step, metric_dict = \
                 training_utils.return_train_val_functions(
                     model=model,
                     optimizer=optimizer,
@@ -237,6 +237,15 @@ def main():
             patience_counter = 0 # simple patience counter for early stopping
             stop_criteria = False
             best_epoch = 0 # track epoch with best validation loss 
+
+            
+            print('building model...')
+            build_step(data_val_ho)
+            total_params = 0
+            for k in model.trainable_variables:
+                var = k.values[0]
+                total_params += tf.size(var)
+            print('built model, total params: ' + str(total_params))
 
             wandb.config.update({"num_epochs_to_start": 0}, allow_val_change=True)
             if wandb.config.load_init:
