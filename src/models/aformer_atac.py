@@ -31,7 +31,7 @@ class genformer(tf.keras.Model):
                  filter_list_atac: list = [32, 64],
                  final_point_scale: int = 6,
                  num_motifs: int = 693,
-                 motif_dropout_rate: float = 0.15,
+                 motif_dropout_rate: float = 0.25,
                  motif_units_fc: int = 32,
                  name: str = 'genformer',
                  **kwargs):
@@ -102,13 +102,13 @@ class genformer(tf.keras.Model):
 
         # convolutional stem for sequence input 
         self.stem_conv = tf.keras.layers.Conv1D(
-            filters= int(self.filter_list_seq[0]), 
-            kernel_size=15, 
+            filters= int(self.filter_list_seq[0]),
+            kernel_size=15,
             kernel_initializer='lecun_normal',
             bias_initializer='zeros', 
             strides=1, 
             padding='same')
-        self.stem_res_conv=Residual(conv_block(int(self.filter_list_seq[0]), 1, 
+        self.stem_res_conv=Residual(conv_block(int(self.filter_list_seq[0]), 1,
                                                     BN_momentum=self.BN_momentum,
                                                     name='pointwise_conv_block'))
         self.stem_pool = SoftmaxPooling1D(name='stem_pool')
@@ -205,7 +205,6 @@ class genformer(tf.keras.Model):
                                             kernel_initializer='lecun_normal',
                                             bias_initializer='zeros',
                                             use_bias=True)
-
 
         self.dropout = kl.Dropout(rate=self.pointwise_dropout_rate,
                                   **kwargs)
