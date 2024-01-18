@@ -1,20 +1,15 @@
 import os
-import numpy as np
 import multiprocessing
+import random
+import numpy as np
+
 os.environ['TF_ENABLE_EAGER_CLIENT_STREAMING_ENQUEUE']='False'
 import tensorflow as tf
 from tensorflow import strings as tfs
 import src.metrics as metrics 
-import src.schedulers
 import src.utils
-import seaborn as sns
-from scipy import stats
-import scipy.stats
-import scipy.ndimage
 from src.losses import poisson_multinomial
-import numpy as np
-import itertools
-import random
+
 
 tf.keras.backend.set_floatx('float32')
 
@@ -640,7 +635,7 @@ def tf_tpu_initialize(tpu_name,zone):
         strategy = tf.distribute.get_strategy()
 
     return strategy
-
+'''
 def make_plots(y_trues,
                y_preds,
                num_points):
@@ -707,6 +702,7 @@ def make_plots(y_trues,
         plt.title("overall atac corr")
 
     return fig_overall, overall_corr,overall_corr_log
+'''
 
 def mask_ATAC_profile(output_length_ATAC, output_length, crop_size, mask_size,output_res, 
                         peaks_c_crop, randomish_seed, atac_mask_int, atac_mask_dropout):

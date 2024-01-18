@@ -1,8 +1,5 @@
 import tensorflow as tf
-from tqdm import tqdm
-
 import tensorflow.experimental.numpy as tnp
-import pandas as pd
 
 '''genformer trial losses'''
 

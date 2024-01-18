@@ -1,14 +1,5 @@
 import tensorflow as tf
 import tensorflow.experimental.numpy as tnp
-import pandas as pd
-import time
-import os
-import sys
-
-import glob
-import json
-import functools
-
 
 def pearsons(y_true, y_pred):
     '''
