@@ -244,7 +244,8 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
     #                            kmer_size=1,
     #                            seed=randomish_seed+12)
 
-    return tf.cast(sequence,dtype=tf.bfloat16), \
+    return tf.cast(tf.ensure_shape(sequence, 
+                                   [input_length,4]),dtype=tf.bfloat16), \
                 tf.cast(masked_atac,dtype=tf.bfloat16), \
                 tf.cast(full_comb_mask_store,dtype=tf.int32), \
                 tf.cast(atac_out,dtype=tf.float32), \
@@ -380,7 +381,8 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
         print('not using sequence')
         sequence = tf.zeros_like(sequence)
 
-    return tf.cast(sequence,dtype=tf.bfloat16), \
+    return tf.cast(tf.ensure_shape(sequence, 
+                                   [input_length,4]),dtype=tf.bfloat16), \
                 tf.cast(masked_atac,dtype=tf.bfloat16), \
                 tf.cast(full_comb_mask_store,dtype=tf.int32), \
                 tf.cast(atac_out,dtype=tf.float32), \
