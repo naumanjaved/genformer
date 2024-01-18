@@ -102,13 +102,13 @@ class genformer(tf.keras.Model):
 
         # convolutional stem for sequence input 
         self.stem_conv = tf.keras.layers.Conv1D(
-            filters= int(self.filter_list_seq[0]),
-            kernel_size=15,
+            filters= int(self.filter_list_seq[0]), 
+            kernel_size=15, 
             kernel_initializer='lecun_normal',
             bias_initializer='zeros', 
             strides=1, 
             padding='same')
-        self.stem_res_conv=Residual(conv_block(int(self.filter_list_seq[0]), 1,
+        self.stem_res_conv=Residual(conv_block(int(self.filter_list_seq[0]), 1, 
                                                     BN_momentum=self.BN_momentum,
                                                     name='pointwise_conv_block'))
         self.stem_pool = SoftmaxPooling1D(name='stem_pool')
