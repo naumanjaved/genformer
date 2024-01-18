@@ -514,7 +514,7 @@ class Performer_Encoder(kl.Layer):
         att_matrices={}
         for idx,layer in enumerate(self.layers):
             if self.use_rot_emb is True:
-                #x += self.pos_emb(x) # for some reason this is in the lucidrains implementation..
+                x += self.pos_emb(x) # c/w with lucid rains implementation
                 rpe = self.layer_pos_emb(x)
                 x,k_prime,q_prime = layer(x, rpe=rpe, training=training)
                 att_matrices['layer_' + str(idx)] = (k_prime,q_prime)
