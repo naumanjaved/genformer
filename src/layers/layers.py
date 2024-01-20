@@ -24,7 +24,7 @@ class SoftmaxPooling1D(kl.Layer):
         self.w_init_scale = w_init_scale
 
         self.dense = kl.Dense(
-            units = num_features,
+            units = 1,
             use_bias=False,
             kernel_initializer=tf.keras.initializers.Identity(gain=self.w_init_scale))
 
