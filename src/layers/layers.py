@@ -24,7 +24,7 @@ class SoftmaxPooling1D(kl.Layer):
         self.w_init_scale = w_init_scale
 
         self.dense = kl.Dense(
-            units = 1,
+            units = num_features,
             use_bias=False,
             kernel_initializer=tf.keras.initializers.Identity(gain=self.w_init_scale))
 
@@ -34,7 +34,6 @@ class SoftmaxPooling1D(kl.Layer):
         inputs = tf.reshape(inputs, [-1, length//self.pool_size,
                                               self.pool_size, num_features])
 
-        # Apply the depthwise convolution to compute logits
         dense_out = self.dense(inputs)
         # Compute softmax weights
         dense_out = tf.nn.softmax(dense_out, axis=-2)
@@ -217,7 +216,7 @@ class FFN(kl.Layer):
                                        kernel_initializer=FFN_kernel1_init if self.load_init else 'lecun_normal',
                                        bias_initializer=FFN_bias1_init if self.load_init else 'lecun_normal',
                                        use_bias=True)
-        self.dropout = kl.Dropout(rate=self.ffn_dropout,**kwargs)
+        self.dropout = kl.Dropout(rate=self.ffn_dropout,**kwargs) # default 0.40 
         self.relu = kl.ReLU()
         self.FFN_dense_narrow = kl.Dense(self.ffn_channels,
                                          activation='linear',
@@ -382,7 +381,7 @@ class Performer(kl.Layer):
                                                   rpe=tf.cast(rpe,dtype=tf.float32),
                                                   **kwargs)
 
-        x = self.dropout(x, training=training)
+        x = self.dropout(x, training=training) ## 0.40 
 
         mha_output = x + inputs
         ## ffn
@@ -445,17 +444,17 @@ class Performer_Encoder(kl.Layer):
         self.load_init=load_init
         self.inits=inits
 
-        self.layers = [Performer(d_model=self.d_model,
-                                 normalize=self.normalize,
-                                 hidden_size=self.hidden_size,
-                                 num_heads=self.num_heads,
-                                 dropout_rate=self.dropout_rate,
-                                 numerical_stabilizer=self.numerical_stabilizer,
-                                 nb_random_features=self.nb_random_features,
-                                 max_seq_length=self.max_seq_length,
-                                 kernel_transformation=self.kernel_transformation,
-                                 seed=self.seed,
-                                 use_rot_emb=self.use_rot_emb,
+        self.layers = [Performer(d_model=self.d_model, # 
+                                 normalize=self.normalize, # 
+                                 hidden_size=self.hidden_size, # 
+                                 num_heads=self.num_heads, # 8 
+                                 dropout_rate=self.dropout_rate, # 
+                                 numerical_stabilizer=self.numerical_stabilizer, # 1.0e-03
+                                 nb_random_features=self.nb_random_features, # ignore 
+                                 max_seq_length=self.max_seq_length, # 8192 
+                                 kernel_transformation=self.kernel_transformation, # relu 
+                                 seed=self.seed, # use whatever 
+                                 use_rot_emb=self.use_rot_emb, # True
                                  load_init=self.load_init,
                                  LN_gamma_init = inits["LN_g" + str(i)] if self.load_init else None,
                                  LN_beta_init=  inits["LN_b" + str(i)] if self.load_init else None,
@@ -514,10 +513,12 @@ class Performer_Encoder(kl.Layer):
         att_matrices={}
         for idx,layer in enumerate(self.layers):
             if self.use_rot_emb is True:
-                x += self.pos_emb(x) # c/w with lucid rains implementation
-                rpe = self.layer_pos_emb(x)
+                #x += self.pos_emb(x) # c/w with lucid rains implementation
+                rpe = self.layer_pos_emb(x) ### check whether fixedpositionalembedding is c/w 
+                                            ### apply_rotary_embedding + fixedposembedding in flaxformer
                 x,k_prime,q_prime = layer(x, rpe=rpe, training=training)
                 att_matrices['layer_' + str(idx)] = (k_prime,q_prime)
+                ## relu, 256 hidden dimensions 
 
         if self.norm:
             x = self.layer_norm(x)

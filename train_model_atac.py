@@ -10,7 +10,7 @@ from tensorflow.keras import mixed_precision
 os.environ['TF_ENABLE_EAGER_CLIENT_STREAMING_ENQUEUE']='False'
 
 ## custom modules
-import src.models.aformer_atac as genformer
+import src.models.aformer_atac_complex as genformer
 import src.optimizers as optimizers
 import training_utils_atac as training_utils
 
@@ -323,14 +323,14 @@ def main():
                 ckpt.batch_num.assign_add(1)
                 if ((epoch_i+1) % args.savefreq) == 0:
                     save_path = manager.save()
-                    print('saving model after: epoch ' + str(epoch_i + 1 + wandb.config.num_epochs_to_start))
+                    print('saving model after: epoch ' + str(1 + wandb.config.num_epochs_to_start + local_epoch))
                     print('corresponds to stop point: start at data batch ' + str(epoch_i + starting_point))
 
                 for key, item in metric_dict.items(): # reset metrics for new epoch
                     item.reset_state()
                 local_epoch += 1
                 if stop_criteria:
-                    print('early stopping at: epoch ' + str(epoch_i))
+                    print('early stopping at: epoch ' + str(1 + wandb.config.num_epochs_to_start + local_epoch))
                     break
 
             print('best model was at: epoch ' + str(best_epoch))

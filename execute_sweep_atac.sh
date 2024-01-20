@@ -26,7 +26,7 @@ python3 train_model_atac.py \
             --decay_frac="0.10" \
             --gradient_clip="1.0" \
             --epsilon=1.0e-8 \
-            --num_transformer_layers="10" \
+            --num_transformer_layers="8" \
             --dropout_rate="0.20" \
             --pointwise_dropout_rate="0.10" \
             --num_heads="4" \
@@ -42,7 +42,7 @@ python3 train_model_atac.py \
             --log_atac="False" \
             --random_mask_size="1536" \
             --use_atac="True" \
-            --final_point_scale="6" \
+            --final_point_scale="2" \
             --use_seq="True" \
             --seed=25 \
             --val_data_seed=25 \
