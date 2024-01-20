@@ -111,7 +111,7 @@ class genformer(tf.keras.Model):
         self.stem_res_conv=Residual(conv_block(int(self.filter_list_seq[0]), 1, 
                                                     BN_momentum=self.BN_momentum,
                                                     name='pointwise_conv_block'))
-        self.stem_pool = SoftmaxPooling1D(name='stem_pool')
+        self.stem_pool = tf.keras.layers.MaxPooling1D(pool_size=2)
 
         # convolutional stem for ATAC profile
         self.stem_conv_atac = tf.keras.layers.Conv1D(
@@ -125,7 +125,7 @@ class genformer(tf.keras.Model):
         self.stem_res_conv_atac =Residual(conv_block(32, 1, 
                                                     BN_momentum=self.BN_momentum,
                                                     name='pointwise_conv_block_atac'))
-        self.stem_pool_atac = SoftmaxPooling1D(name='atac_stem_pool')
+        self.stem_pool_atac = tf.keras.layers.MaxPooling1D(pool_size=2)
 
         # convolutional tower for sequence input
         self.conv_tower = tf.keras.Sequential([
@@ -138,7 +138,7 @@ class genformer(tf.keras.Model):
                 Residual(conv_block(num_filters, 1, 
                                     BN_momentum=self.BN_momentum,
                                     name=f'pointwise_conv_{i}')),
-                SoftmaxPooling1D(name=f'soft_max_pool_{i}')],
+                tf.keras.layers.MaxPooling1D(pool_size=2)],
                        name=f'conv_tower_block_{i}')
             for i, num_filters in enumerate(self.filter_list_seq)], name='conv_tower')
 
@@ -154,7 +154,7 @@ class genformer(tf.keras.Model):
                 Residual(conv_block(num_filters, 1, 
                                     BN_momentum=self.BN_momentum,
                                     name=f'pointwise_conv_atac_{i}')),
-                SoftmaxPooling1D(pool_size=4,name=f'soft_max_pool_atac_{i}')],
+                tf.keras.layers.MaxPooling1D(pool_size=4)],
                        name=f'conv_tower_block_atac_{i}')
             for i, num_filters in enumerate(self.filter_list_atac)], name='conv_tower_atac')
 
@@ -247,7 +247,7 @@ class genformer(tf.keras.Model):
         out = self.gelu(out)
 
         out = self.final_dense_profile(out, training=training)
-        out_profile = self.crop_final(out) ## tom crops only on loss, tom will try cropping less 
+        out_profile = self.crop_final(out) ## tom crops only on loss, tom will try cropping less
         return out_profile
 
 
