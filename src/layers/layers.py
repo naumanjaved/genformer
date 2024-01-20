@@ -511,6 +511,7 @@ class Performer_Encoder(kl.Layer):
 
     def call(self, x, training=None, **kwargs):
         att_matrices={}
+        x = tf.cast(x, dtype=tf.float32)
         for idx,layer in enumerate(self.layers):
             if self.use_rot_emb is True:
                 #x += self.pos_emb(x) # c/w with lucid rains implementation
@@ -525,7 +526,7 @@ class Performer_Encoder(kl.Layer):
 
         if self.norm:
             x = self.layer_norm(x)
-
+        x = tf.cast(x,dtype=tf.bfloat16)
         return x,att_matrices
 
 @tf.keras.utils.register_keras_serializable()

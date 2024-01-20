@@ -532,13 +532,12 @@ class Attention(tf.keras.layers.Layer):
         dim = q.shape[-1]
         tgt_len = k.shape[1]
 
-
         if self.use_rot_emb:
             q,k = apply_rotary_pos_emb(q,k,rpe)
             attention_output, k_prime, q_prime = favor_attention(q, k, v,
                                        kernel_transform, self.causal,
                                        self.projection_matrix)
-        if rpe is None and not self.use_rot_emb:
+        else:
             attention_output, k_prime, q_prime = favor_attention(q, k, v,
                                        kernel_transform, self.causal,
                                        self.projection_matrix)
@@ -553,8 +552,8 @@ class SelfAttention(Attention):
 
     def call(self,
            query_input,
-           rpe,
-           training,
+           rpe=None,
+           training=True,
            cache=None,
            decode_loop_step=None):
         return super(SelfAttention, self).call(query_input, query_input, rpe,
