@@ -377,9 +377,9 @@ class Performer(kl.Layer):
     def call(self, inputs, rpe=None, training=None, **kwargs):
         x = self.layer_norm(inputs)
         x, k_prime, q_prime = self.self_attention(tf.cast(x,dtype=tf.float32),
-                                                  tf.cast(x,dtype=tf.float32),
-                                                  rpe=tf.cast(rpe,dtype=tf.float32),
-                                                  **kwargs)
+                                                tf.cast(x,dtype=tf.float32),
+                                                rpe=tf.cast(rpe,dtype=tf.float32),
+                                                **kwargs)
 
         x = self.dropout(x, training=training) ## 0.40 
 
@@ -479,9 +479,9 @@ class Performer_Encoder(kl.Layer):
         N = input_shape[0]
         L = input_shape[1]
 
-        if self.use_rot_emb:
-            self.pos_emb = FixedPositionalEmbedding(self.d_model, self.max_seq_length)
-            self.layer_pos_emb = FixedPositionalEmbedding(self.dim, self.max_seq_length)
+        #if self.use_rot_emb:
+        self.pos_emb = FixedPositionalEmbedding(self.d_model, self.max_seq_length)
+        self.layer_pos_emb = FixedPositionalEmbedding(self.dim, self.max_seq_length)
 
         super(Performer_Encoder,self).build(input_shape)
 
@@ -513,16 +513,12 @@ class Performer_Encoder(kl.Layer):
         att_matrices={}
         x = tf.cast(x, dtype=tf.float32)
         for idx,layer in enumerate(self.layers):
-            if self.use_rot_emb is True:
-                #x += self.pos_emb(x) # c/w with lucid rains implementation
-                rpe = self.layer_pos_emb(x) ### check whether fixedpositionalembedding is c/w 
-                                            ### apply_rotary_embedding + fixedposembedding in flaxformer
-                x,k_prime,q_prime = layer(x, rpe=rpe, training=training)
-                att_matrices['layer_' + str(idx)] = (k_prime,q_prime)
-                ## relu, 256 hidden dimensions
-            else:
-                x,k_prime,q_prime = layer(x, rpe=None, training=training)
-                att_matrices['layer_' + str(idx)] = (k_prime,q_prime)
+            #x += self.pos_emb(x) # c/w with lucid rains implementation
+            rpe = self.layer_pos_emb(x) ### check whether fixedpositionalembedding is c/w 
+                                        ### apply_rotary_embedding + fixedposembedding in flaxformer
+            x,k_prime,q_prime = layer(x, rpe=rpe, training=training)
+            att_matrices['layer_' + str(idx)] = (k_prime,q_prime)
+            ## relu, 256 hidden dimensions
 
         if self.norm:
             x = self.layer_norm(x)
