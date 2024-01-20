@@ -241,13 +241,13 @@ class genformer(tf.keras.Model):
 
         transformer_input = tf.concat([sequence,atac_x, motif_activity], axis=2) # append processed seq,atac,motif inputs in channel dim.
         out_performer,att_matrices = self.performer(transformer_input, training=training)
-        out = self.crop_final(out_performer) ## tom crops only on loss, tom will try cropping less 
-        out = self.final_pointwise_conv(out, training=training) ## 
+        
+        out = self.final_pointwise_conv(out_performer, training=training) ## 
         out = self.dropout(out, training=training) ## 0.05 default in tom's implementation
         out = self.gelu(out)
 
-        out_profile = self.final_dense_profile(out, training=training)
-
+        out = self.final_dense_profile(out, training=training)
+        out_profile = self.crop_final(out) ## tom crops only on loss, tom will try cropping less 
         return out_profile
 
 
