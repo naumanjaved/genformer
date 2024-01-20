@@ -518,7 +518,10 @@ class Performer_Encoder(kl.Layer):
                                             ### apply_rotary_embedding + fixedposembedding in flaxformer
                 x,k_prime,q_prime = layer(x, rpe=rpe, training=training)
                 att_matrices['layer_' + str(idx)] = (k_prime,q_prime)
-                ## relu, 256 hidden dimensions 
+                ## relu, 256 hidden dimensions
+            else:
+                x,k_prime,q_prime = layer(x, rpe=None, training=training)
+                att_matrices['layer_' + str(idx)] = (k_prime,q_prime)
 
         if self.norm:
             x = self.layer_norm(x)
