@@ -87,7 +87,7 @@ def main():
             'tpu': args.tpu_name,
             'gcs_path': args.gcs_path,
             'gcs_path_holdout': args.gcs_path_holdout,
-            'num_epochs': 44,
+            'num_epochs': 88,
             'val_examples_ho': args.val_examples_ho,
             'batch_size': args.batch_size,
             'patience': args.patience,
@@ -147,7 +147,7 @@ def main():
                                                             wandb.config.val_steps_ho, wandb.config.use_motif_activity,
                                                             g, g_val)
         
-        train_human_its_mult = train_human_its * 3
+        train_human_its_mult = train_human_its * 2
 
         print('created dataset iterators')
         # initialize model
