@@ -31,7 +31,7 @@ class genformer(tf.keras.Model):
                  filter_list_atac: list = [32, 64],
                  final_point_scale: int = 6,
                  num_motifs: int = 693,
-                 motif_dropout_rate: float = 0.25,
+                 motif_dropout_rate: float = 0.20,
                  motif_units_fc: int = 32,
                  name: str = 'genformer',
                  **kwargs):
@@ -103,10 +103,10 @@ class genformer(tf.keras.Model):
         # convolutional stem for sequence input 
         self.stem_conv = tf.keras.layers.Conv1D(
             filters= int(self.filter_list_seq[0]), 
-            kernel_size=15, 
+            kernel_size=15,
             kernel_initializer='lecun_normal',
-            bias_initializer='zeros', 
-            strides=1, 
+            bias_initializer='zeros',
+            strides=1,
             padding='same')
         self.stem_res_conv=Residual(conv_block(int(self.filter_list_seq[0]), 1, 
                                                     BN_momentum=self.BN_momentum,
@@ -153,8 +153,8 @@ class genformer(tf.keras.Model):
             for i, num_filters in enumerate(self.filter_list_atac)], name='conv_tower_atac')
 
         # dropout for TF activity
-        self.motif_dropout1=kl.Dropout( rate=self.motif_dropout_rate, **kwargs)
-        # dense layer for TF activity
+        self.motif_dropout1=kl.Dropout(rate=self.motif_dropout_rate, **kwargs)
+        # dense layer for motif activity
         self.motif_activity_fc1 = kl.Dense(
             self.motif_units_fc,
             activation='gelu',
@@ -210,6 +210,10 @@ class genformer(tf.keras.Model):
                                   **kwargs)
         self.gelu = tfa.layers.GELU()
 
+        self.motif_activity_LN = layer_norm_fp32(epsilon=1e-05,
+                                                  beta_initializer="zeros",
+                                                  gamma_initializer="ones")
+
 
     def call(self, inputs, training:bool=True):
 
@@ -228,20 +232,22 @@ class genformer(tf.keras.Model):
         atac_x = self.conv_tower_atac(atac_x,training=training)
 
         ### motif activity processing w/ MLP
+        motif_activity = self.motif_activity_LN(motif_activity)
         motif_activity = self.motif_activity_fc1(motif_activity)
         motif_activity = self.motif_dropout1(motif_activity,training=training)
         motif_activity = self.motif_activity_fc2(motif_activity)
+        motif_activity = self.motif_dropout1(motif_activity,training=training)
         motif_activity = tf.tile(motif_activity, [1, self.output_length, 1])
 
-        transformer_input = tf.concat([sequence,atac_x, motif_activity], axis=2) # append processed seq,atac,motif inputs in channel dim.
+        transformer_input = tf.concat([sequence,atac_x, motif_activity], 
+                                      axis=2) # append processed seq,atac,motif inputs in channel dim.
         out_performer,att_matrices = self.performer(transformer_input, training=training)
-        out = self.crop_final(out_performer)
-        out = self.final_pointwise_conv(out, training=training)
-        out = self.dropout(out, training=training)
+        
+        out = self.final_pointwise_conv(out_performer, training=training) ## 
+        out = self.dropout(out, training=training) ## 0.05 default in tom's implementation
         out = self.gelu(out)
-
-        out_profile = self.final_dense_profile(out, training=training)
-
+        out = self.final_dense_profile(out, training=training)
+        out_profile = self.crop_final(out) ## tom crops only on loss, tom will try cropping less 
         return out_profile
 
 
@@ -298,10 +304,12 @@ class genformer(tf.keras.Model):
         atac_x = self.conv_tower_atac(atac_x,training=training)
 
         ### motif activity processing w/ MLP
+        motif_activity = self.motif_activity_LN(motif_activity)
         motif_activity = self.motif_activity_fc1(motif_activity)
         motif_activity = self.motif_dropout1(motif_activity,training=training)
         motif_activity = self.motif_activity_fc2(motif_activity)
-        motif_activity = tf.tile(motif_activity, [1, 4096, 1])
+        motif_activity = self.motif_dropout1(motif_activity,training=training)
+        motif_activity = tf.tile(motif_activity, [1, self.output_length, 1])
 
         transformer_input = tf.concat([sequence,atac_x, motif_activity], axis=2) # append processed seq,atac,motif inputs in channel dim.
         out_performer,att_matrices = self.performer(transformer_input, training=training)

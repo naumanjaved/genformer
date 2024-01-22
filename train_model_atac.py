@@ -10,7 +10,7 @@ from tensorflow.keras import mixed_precision
 os.environ['TF_ENABLE_EAGER_CLIENT_STREAMING_ENQUEUE']='False'
 
 ## custom modules
-import src.models.aformer_atac_complex as genformer
+import src.models.aformer_atac as genformer # can toggle which model you want here
 import src.optimizers as optimizers
 import training_utils_atac as training_utils
 
