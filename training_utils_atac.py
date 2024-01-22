@@ -567,7 +567,7 @@ def parse_args(parser):
     parser.add_argument('--BN_momentum', type=float, default=0.80, help='BN_momentum')
     parser.add_argument('--kernel_transformation', type=str, default="relu_kernel_transformation", help='kernel_transformation')
     parser.add_argument('--savefreq', type=int, help='savefreq')
-    parser.add_argument('--checkpoint_path', type=str, default="gs://[path]/iteration_10", help='checkpoint_path')
+    parser.add_argument('--checkpoint_path', type=str, default=None, help='checkpoint_path')
     parser.add_argument('--load_init', type=str, default="True", help='load_init')
     parser.add_argument('--normalize', type=str, default="True", help='normalize')
     parser.add_argument('--norm', type=str, default="True", help='norm')
@@ -589,6 +589,7 @@ def parse_args(parser):
     parser.add_argument('--total_weight_loss',type=str, default="0.15", help= 'total_weight_loss')
     parser.add_argument('--use_rot_emb',type=str, default="True", help= 'use_rot_emb')
     parser.add_argument('--best_val_loss', type=float, default=0.09113)
+    parser.add_argument('--run_id', type=str, default=None)
     args = parser.parse_args()
     return parser
 

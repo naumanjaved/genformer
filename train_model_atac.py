@@ -103,12 +103,12 @@ def main():
             
             wandb.init(config=config_defaults,
                        project= args.wandb_project,
-                       id=mod_run_name + "_" + str(args.seed),
+                       id=None if not parse_bool_str(args.load_init) else args.run_id,
                        name = mod_run_name + "_" + str(args.seed),
-                       entity=args.wandb_user,resume="allow")
+                       entity=args.wandb_user,resume="allow" if not parse_bool_str(args.load_init) else "must")
             
             wandb.run.name = mod_run_name + "_" + str(args.seed)
-
+            print('run_id:' + wandb.util.generate_id())
             wandb.config.tpu=args.tpu_name
             wandb.config.gcs_path=args.gcs_path
             wandb.config.gcs_path_holdout=args.gcs_path_holdout
