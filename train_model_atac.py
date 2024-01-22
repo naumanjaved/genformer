@@ -104,8 +104,8 @@ def main():
                 name = mod_run_name + "_" + str(args.seed),
                 entity=args.wandb_user, 
                 resume="allow" if not (parse_bool_str(args.load_init) and (args.run_id is not None)) else "must")
-    wandb.run.name = mod_run_name + "_" + str(args.seed)
     print('run_id:' + wandb.util.generate_id())
+    wandb.run.name = mod_run_name + "_" + str(args.seed) + "_" + wandb.util.generate_id()
 
     with strategy.scope(): ## keep remainder of parameter initialization within TPU/GPU strategy scope
         # TFrecord dataset options
