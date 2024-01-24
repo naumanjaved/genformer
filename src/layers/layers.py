@@ -129,47 +129,6 @@ class Residual(kl.Layer):
     def call(self, inputs, training=None,**kwargs):
         return inputs + self._layer(inputs, training=training, **kwargs)
 
-@tf.keras.utils.register_keras_serializable()
-class layer_norm_fp32(kl.Layer):
-    def __init__(self,
-                 epsilon=1e-05,
-                 beta_initializer="zeros",
-                 gamma_initializer="ones",
-                 name: str = 'layer_norm_fp32',
-                 **kwargs):
-
-        super().__init__(name=name, **kwargs)
-        """ Layer norm layer that ensures fp32 precision for stability. May be redundant - 
-            to revisit. 
-        Args:
-          epsilon: epsilon for layernorm 
-          beta_initializer: beta initializer for layernorm
-          gamma_initializer: gamma initializer for layernorm
-          name: Module name.
-        """
-        self.epsilon=epsilon
-        self.beta_initializer=beta_initializer
-        self.gamma_initializer=gamma_initializer
-        self.layer_norm = kl.LayerNormalization(axis=-1,
-                                                  scale=True,
-                                                  center=True,
-                                                    epsilon=self.epsilon,
-                                                  beta_initializer=self.beta_initializer,
-                                                  gamma_initializer=self.gamma_initializer)
-
-    def get_config(self):
-        config = {
-            "epsilon":self.epsilon
-        }
-        base_config = super().get_config()
-        return {**base_config, **config}
-
-    @classmethod
-    def from_config(cls, config):
-        return cls(**config)
-
-    def call(self, inputs, training=None):
-        return self.layer_norm(inputs)
 
 @tf.keras.utils.register_keras_serializable()
 class FFN(kl.Layer):
@@ -205,8 +164,10 @@ class FFN(kl.Layer):
         self.FFN_kernel2_init=FFN_kernel2_init
         self.FFN_bias2_init=FFN_bias2_init
 
-
-        self.FFN_layer_norm = layer_norm_fp32(epsilon=1e-05,
+        self.FFN_layer_norm = kl.LayerNormalization(axis=-1,
+                                                  scale=True,
+                                                  center=True,
+                                                    epsilon=1e-05,
                                                   beta_initializer=FFN_LN_beta_init if self.load_init else "zeros",
                                                   gamma_initializer=FFN_LN_gamma_init if self.load_init else "ones")
         self.FFN_dense_wide = kl.Dense(self.ffn_channels*self.ffn_widening,
@@ -313,9 +274,13 @@ class Performer(kl.Layer):
         self.FFN_kernel2_init=FFN_kernel2_init
         self.FFN_bias2_init=FFN_bias2_init
 
-        self.layer_norm = layer_norm_fp32(epsilon=1e-05,
+        self.layer_norm = kl.LayerNormalization(axis=-1,
+                                                  scale=True,
+                                                  center=True,
+                                                    epsilon=1.0e-05,
                                                   beta_initializer="zeros",
                                                   gamma_initializer="ones")
+
 
 
         self.self_attention = fa_rpe.Attention(hidden_size=self.d_model,
@@ -468,10 +433,13 @@ class Performer_Encoder(kl.Layer):
                                  FFN_bias2_init= inits["FFN_narr_b" + str(i)] if self.load_init else None,
                                  **kwargs) for i in range(self.num_layers)]
 
-        self.layer_norm = layer_norm_fp32(epsilon=1e-05,
+
+        self.layer_norm = kl.LayerNormalization(axis=-1,
+                                                  scale=True,
+                                                  center=True,
+                                                    epsilon=1.0e-05,
                                                   beta_initializer=self.inits["performer_encoder_LN_b"] if self.load_init else "zeros",
                                                   gamma_initializer=self.inits["performer_encoder_LN_g"] if self.load_init else "ones")
-
 
     def build(self, input_shape):
         N = input_shape[0]

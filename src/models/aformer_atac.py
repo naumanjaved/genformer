@@ -210,7 +210,10 @@ class genformer(tf.keras.Model):
                                   **kwargs)
         self.gelu = tfa.layers.GELU()
 
-        self.motif_activity_LN = layer_norm_fp32(epsilon=1e-05,
+        self.motif_activity_LN = kl.LayerNormalization(axis=-1,
+                                                  scale=True,
+                                                  center=True,
+                                                    epsilon=1e-05,
                                                   beta_initializer="zeros",
                                                   gamma_initializer="ones")
 
