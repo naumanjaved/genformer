@@ -1,7 +1,7 @@
 #!/bin/bash -l
 
 python3 train_model_atac.py \
-            --tpu_name="pod10" \
+            --tpu_name="pod11" \
             --tpu_zone="europe-west4-a" \
             --wandb_project="atac_pretraining" \
             --wandb_user="njaved" \
@@ -22,11 +22,11 @@ python3 train_model_atac.py \
             --min_delta=0.0000005 \
             --model_save_dir="gs://genformer_europe_west_copy/atac_pretrain/models" \
             --model_save_basename="genformer" \
-            --lr_base="1.0e-04" \
+            --lr_base="5.0e-04" \
             --decay_frac="0.10" \
-            --gradient_clip="1.0" \
+            --gradient_clip="2.0" \
             --epsilon=1.0e-8 \
-            --num_transformer_layers="8" \
+            --num_transformer_layers="9" \
             --dropout_rate="0.20" \
             --pointwise_dropout_rate="0.10" \
             --num_heads="4" \

@@ -82,6 +82,7 @@ def main():
             'loss_type':  str(args.loss_type),
             'total_weight_loss':  float(args.total_weight_loss),
             'use_rot_emb': parse_bool_str(args.use_rot_emb),
+            'reset_optimizer_lr': parse_bool_str(args.reset_optimizer_lr),
             'best_val_loss': float(args.best_val_loss),
             'checkpoint_path': args.checkpoint_path,
             'tpu': args.tpu_name,
@@ -101,11 +102,12 @@ def main():
     wandb.init(config=config,
                 project= args.wandb_project,
                 id=args.run_id,
-                name = mod_run_name + "_" + str(args.seed),
-                entity=args.wandb_user, 
+                name = None if not parse_bool_str(args.load_init) else mod_run_name + "_" + str(args.seed),
+                entity=args.wandb_user,
                 resume="allow" if not (parse_bool_str(args.load_init) and (args.run_id is not None)) else "must")
-    print('run_id:' + wandb.util.generate_id())
-    wandb.run.name = mod_run_name + "_" + str(args.seed) + "_" + wandb.util.generate_id()
+    run_id_unique = wandb.util.generate_id()
+    print('run_id:' + run_id_unique)
+    wandb.run.name = mod_run_name + "_" + str(args.seed) + "_" + run_id_unique
 
     with strategy.scope(): ## keep remainder of parameter initialization within TPU/GPU strategy scope
         # TFrecord dataset options
@@ -240,6 +242,9 @@ def main():
             print('restart at data batch: ' + str(batch_num.numpy()))
             wandb.config.update({"num_epochs_to_start": batch_num.numpy()}, 
                                 allow_val_change=True)
+            if wandb.config.reset_optimizer_lr:
+                optimizer.iterations.assign(0)
+
         
         starting_point = wandb.config.num_epochs_to_start % len(train_human_its_mult)
         local_epoch = 0
@@ -266,7 +271,7 @@ def main():
             duration = (time.time() - start) / 60.
 
             print('completed epoch ' + str(1 + wandb.config.num_epochs_to_start + local_epoch) + ' - duration(mins): ' + str(duration))
-
+            print('lr at:' + str(optimizer.lr.values[0]))
             # main validation step:
             # - run the validation loop
             # - return the true and predicted values to allow for plotting and other metrics
@@ -307,7 +312,7 @@ def main():
             if ((epoch_i+1) % args.savefreq) == 0:
                 save_path = manager.save()
                 print('saving model after: epoch ' + str(1 + wandb.config.num_epochs_to_start + local_epoch))
-                print('corresponds to stop point: start at data batch ' + str(epoch_i + starting_point))
+                print('corresponds to stop point: start at data batch ' + str(epoch_i))
 
             for key, item in metric_dict.items(): # reset metrics for new epoch
                 item.reset_state()
