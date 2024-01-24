@@ -180,7 +180,7 @@ def main():
             initial_learning_rate=wandb.config.lr_base,
             decay_steps=wandb.config.total_steps*wandb.config.num_epochs, alpha=wandb.config.decay_frac)
         scheduler=optimizers.WarmUp(initial_learning_rate=wandb.config.lr_base,
-                                        warmup_steps=10000,
+                                        warmup_steps=wandb.config.total_steps,
                                         decay_schedule_fn=scheduler)
         optimizer = tf.keras.optimizers.AdamW(learning_rate=scheduler, 
                                                 epsilon=wandb.config.epsilon,
@@ -272,6 +272,7 @@ def main():
 
             print('completed epoch ' + str(1 + wandb.config.num_epochs_to_start + local_epoch) + ' - duration(mins): ' + str(duration))
             print('lr at:' + str(optimizer.lr.values[0]))
+            print('optimizer iterations at :' + str(optimizer.iterations.values[0]))
             # main validation step:
             # - run the validation loop
             # - return the true and predicted values to allow for plotting and other metrics
