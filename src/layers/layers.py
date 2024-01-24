@@ -511,7 +511,6 @@ class Performer_Encoder(kl.Layer):
 
     def call(self, x, training=None, **kwargs):
         att_matrices={}
-        x = tf.cast(x, dtype=tf.float32)
         for idx,layer in enumerate(self.layers):
             #x += self.pos_emb(x) # c/w with lucid rains implementation
             rpe = self.layer_pos_emb(x) ### check whether fixedpositionalembedding is c/w 
@@ -522,7 +521,6 @@ class Performer_Encoder(kl.Layer):
 
         if self.norm:
             x = self.layer_norm(x)
-        x = tf.cast(x,dtype=tf.bfloat16)
         return x,att_matrices
 
 @tf.keras.utils.register_keras_serializable()
@@ -595,7 +593,7 @@ class FixedPositionalEmbedding(tf.keras.layers.Layer):
 
     def call(self, x):
         return tf.cast(self.emb[None, :x.shape[1], :],
-                       dtype=tf.bfloat16)
+                       dtype=tf.float32)
 
 @tf.keras.utils.register_keras_serializable()
 class TargetLengthCrop1D(kl.Layer):
