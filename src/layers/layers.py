@@ -348,7 +348,7 @@ class Performer(kl.Layer):
 
         x = self.dropout(x, training=training) ## 0.40 
 
-        mha_output = x + inputs
+        mha_output = tf.cast(x + inputs,dtype=tf.float32)
         ## ffn
         FFN_out = self.FFN(mha_output,training=training,**kwargs)
         #return self.layer_norm(FFN_out + mha_output), k_prime, q_prime
