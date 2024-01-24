@@ -203,12 +203,14 @@ class FFN(kl.Layer):
         return cls(**config)
 
     def call(self, inputs, training=None):
-        x = self.FFN_layer_norm(inputs)
+        x = tf.cast(inputs,dtype=tf.float32)
+        x = self.FFN_layer_norm(x)
         x = self.FFN_dense_wide(x)
         x = self.dropout(x,training=training)
         x = self.relu(x)
         x = self.FFN_dense_narrow(x)
         x = self.dropout(x,training=training)
+        x = tf.cast(x,dtype=tf.float32)
         return x
 
 @tf.keras.utils.register_keras_serializable()
@@ -479,7 +481,7 @@ class Performer_Encoder(kl.Layer):
         att_matrices={}
         x = tf.cast(x, dtype=tf.float32)
         for idx,layer in enumerate(self.layers):
-            #x += self.pos_emb(x) # c/w with lucid rains implementation
+            x += self.pos_emb(x) # c/w with lucid rains implementation
             rpe = self.layer_pos_emb(x) ### check whether fixedpositionalembedding is c/w 
                                         ### apply_rotary_embedding + fixedposembedding in flaxformer
             x,k_prime,q_prime = layer(x, rpe=rpe, training=training)
