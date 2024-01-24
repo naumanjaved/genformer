@@ -88,7 +88,7 @@ def main():
             'tpu': args.tpu_name,
             'gcs_path': args.gcs_path,
             'gcs_path_holdout': args.gcs_path_holdout,
-            'num_epochs': 88,
+            'num_epochs': args.num_epochs,
             'val_examples_ho': args.val_examples_ho,
             'batch_size': args.batch_size,
             'patience': args.patience,

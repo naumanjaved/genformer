@@ -51,4 +51,7 @@ python3 train_model_atac.py \
             --total_weight_loss="0.15" \
             --use_rot_emb="True" \
             --best_val_loss=100.0 \
-            --loss_type="poisson"
+            --loss_type="poisson" \
+            --checkpoint_path="none" \
+            --num_epochs=50
+

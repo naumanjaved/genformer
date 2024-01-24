@@ -543,6 +543,7 @@ def parse_args(parser):
     parser.add_argument('--num_parallel', type=int, default=multiprocessing.cpu_count(), help='thread count for tensorflow record loading')
     parser.add_argument('--batch_size', default=1, type=int, help='batch_size')
     parser.add_argument('--val_examples_ho', type=int, help='val_examples_ho')
+    parser.add_argument('--num_epochs', type=int, help='num_epochs')
     parser.add_argument('--patience', type=int, help='patience for early stopping')
     parser.add_argument('--min_delta', type=float, help='min_delta for early stopping')
     parser.add_argument('--model_save_dir', type=str)
