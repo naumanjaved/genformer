@@ -169,8 +169,7 @@ class layer_norm_fp32(kl.Layer):
         return cls(**config)
 
     def call(self, inputs, training=None):
-        x = self.layer_norm(x)
-        return x
+        return self.layer_norm(inputs)
 
 @tf.keras.utils.register_keras_serializable()
 class FFN(kl.Layer):
