@@ -481,7 +481,7 @@ class Performer_Encoder(kl.Layer):
         att_matrices={}
         x = tf.cast(x, dtype=tf.float32)
         for idx,layer in enumerate(self.layers):
-            x += self.pos_emb(x) # c/w with lucid rains implementation
+            #x += self.pos_emb(x) # c/w with lucid rains implementation
             rpe = self.layer_pos_emb(x) ### check whether fixedpositionalembedding is c/w 
                                         ### apply_rotary_embedding + fixedposembedding in flaxformer
             x,k_prime,q_prime = layer(x, rpe=rpe, training=training)
