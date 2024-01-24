@@ -169,9 +169,8 @@ class layer_norm_fp32(kl.Layer):
         return cls(**config)
 
     def call(self, inputs, training=None):
-        x = tf.cast(inputs,dtype=tf.float32)
         x = self.layer_norm(x)
-        return tf.cast(x, dtype=tf.bfloat16)
+        return x
 
 @tf.keras.utils.register_keras_serializable()
 class FFN(kl.Layer):
@@ -511,6 +510,7 @@ class Performer_Encoder(kl.Layer):
 
     def call(self, x, training=None, **kwargs):
         att_matrices={}
+        x = tf.cast(x, dtype=tf.float32)
         for idx,layer in enumerate(self.layers):
             #x += self.pos_emb(x) # c/w with lucid rains implementation
             rpe = self.layer_pos_emb(x) ### check whether fixedpositionalembedding is c/w 
@@ -521,6 +521,7 @@ class Performer_Encoder(kl.Layer):
 
         if self.norm:
             x = self.layer_norm(x)
+        x = tf.cast(x, dtype=tf.bfloat16)
         return x,att_matrices
 
 @tf.keras.utils.register_keras_serializable()
