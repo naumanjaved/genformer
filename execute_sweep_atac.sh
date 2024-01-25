@@ -48,11 +48,10 @@ python3 train_model_atac.py \
             --checkpoint_path="none" \
             --num_epochs=50 \
             --load_init="False" \
-            --checkpoint_path=None \
-            --run_id=None \
             --model_save_basename="genformer" \
             --lr_base="1.0e-04" \
             --decay_frac="0.05" \
             --gradient_clip="1.0" \
             --seed=13 \
-            --val_data_seed=25 
+            --val_data_seed=25  \
+            --num_epochs=60
