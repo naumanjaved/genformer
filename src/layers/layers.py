@@ -346,7 +346,7 @@ class Performer(kl.Layer):
                                                 rpe=tf.cast(rpe,dtype=tf.float32),
                                                 **kwargs)
 
-        x = self.dropout(x, training=training) ## 0.40 
+        x = self.dropout(x, training=training) ## 0.40
 
         mha_output = tf.cast(x + inputs,dtype=tf.float32)
         ## ffn
