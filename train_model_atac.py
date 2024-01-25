@@ -105,7 +105,7 @@ def main():
                 name = None if not parse_bool_str(args.load_init) else mod_run_name + "_" + str(args.seed),
                 entity=args.wandb_user,
                 resume="allow" if not (parse_bool_str(args.load_init) and (args.run_id is not None)) else "must")
-    run_id_unique = wandb.util.generate_id()
+    run_id_unique = wandb.run.id
     print('run_id:' + run_id_unique)
     wandb.run.name = mod_run_name + "_" + str(args.seed) + "_" + run_id_unique
 
