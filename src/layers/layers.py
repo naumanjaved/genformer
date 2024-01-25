@@ -493,59 +493,7 @@ class Performer_Encoder(kl.Layer):
         x = tf.cast(x, dtype=tf.bfloat16)
         return x,att_matrices
 
-@tf.keras.utils.register_keras_serializable()
-class abs_sin_PE(kl.Layer):
-    def __init__(self,
-                 name: str='sinusoidal_pos_encoding',
-                 **kwargs):
-        """basic absolute sinusoidal PE layer
-        Args:
-            positional_dropout_rate: dropout rate for positional embeddings
-        """
-        super().__init__(name=name,**kwargs)
 
-    def build(self, input_shape):
-        self._pe = utils.sinusoidal(input_shape)
-        super(abs_sin_PE,self).build(input_shape)
-
-    def get_config(self):
-        base_config = super().get_config()
-        return{**base_config, **config}
-    @classmethod
-    def from_config(cls, config):
-        return cls(**config)
-
-    def call(self, inputs, training=None):
-        return tf.cast(self._pe,dtype=tf.bfloat16) + tf.cast(inputs,dtype=tf.bfloat16)
-
-@tf.keras.utils.register_keras_serializable()
-class rotary_PE(kl.Layer):
-    def __init__(self,
-                 positional_dropout_rate: float,
-                 name: str='sinusoidal_pos_encoding',
-                 **kwargs):
-        """basic absolute sinusoidal PE layer
-        Args:
-            positional_dropout_rate: dropout rate for positional embeddings
-        """
-        super().__init__(name=name,**kwargs)
-        self._positional_dropout_rate = positional_dropout_rate
-        self._dropout = kl.Dropout(rate=self._positional_dropout_rate,**kwargs)
-
-    def build(self, input_shape):
-        self._pe = utils.sinusoidal(input_shape)
-        super(abs_sin_PE,self).build(input_shape)
-
-    def get_config(self):
-        config = {
-            "dropout":self._positional_dropout_rate
-        }
-        base_config = super().get_config()
-        return{**base_config, **config}
-
-    def call(self, inputs, training=None):
-        return self._dropout(self._pe + inputs,
-                             training=training)
 
 @tf.keras.utils.register_keras_serializable()
 class FixedPositionalEmbedding(tf.keras.layers.Layer):
@@ -569,8 +517,8 @@ class FixedPositionalEmbedding(tf.keras.layers.Layer):
 class TargetLengthCrop1D(kl.Layer):
     """Crop sequence to match the desired target length."""
     def __init__(self,
-               uncropped_length: int = 768,
-               target_length: int = 448,
+               uncropped_length: int = 4096,
+               target_length: int = 4092,
                name: str = 'target_length_crop'):
         super().__init__(name=name)
         self._target_length = target_length

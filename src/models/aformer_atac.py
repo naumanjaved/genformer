@@ -195,10 +195,10 @@ class genformer(tf.keras.Model):
                                              target_length=self.final_output_length,
                                              name='target_input')
 
-        self.final_pointwise_conv = conv_block(filters=self.filter_list_seq[-1] // self.final_point_scale,
-                                                BN_momentum=self.BN_momentum,
-                                                  **kwargs,
-                                                  name = 'final_pointwise')
+        self.final_pointwise_conv = conv_block(filters=self.filter_list_seq[-1] * self.final_point_scale,
+                                               BN_momentum=self.BN_momentum,
+                                               **kwargs,
+                                               name = 'final_pointwise')
 
         self.final_dense_profile = kl.Dense(1,
                                             activation='softplus',
@@ -211,11 +211,11 @@ class genformer(tf.keras.Model):
         self.gelu = tfa.layers.GELU()
 
         self.motif_activity_LN = kl.LayerNormalization(axis=-1,
-                                                  scale=True,
-                                                  center=True,
-                                                    epsilon=1e-05,
-                                                  beta_initializer="zeros",
-                                                  gamma_initializer="ones")
+                                                       scale=True,
+                                                       center=False,
+                                                       epsilon=1e-05,
+                                                       beta_initializer="zeros",
+                                                       gamma_initializer="ones")
 
 
     def call(self, inputs, training:bool=True):
@@ -235,11 +235,9 @@ class genformer(tf.keras.Model):
         atac_x = self.conv_tower_atac(atac_x,training=training)
 
         ### motif activity processing w/ MLP
-        motif_activity = self.motif_activity_LN(motif_activity)
         motif_activity = self.motif_activity_fc1(motif_activity)
         motif_activity = self.motif_dropout1(motif_activity,training=training)
         motif_activity = self.motif_activity_fc2(motif_activity)
-        motif_activity = self.motif_dropout1(motif_activity,training=training)
         motif_activity = tf.tile(motif_activity, [1, self.output_length, 1])
 
         transformer_input = tf.concat([sequence,atac_x, motif_activity], 
@@ -307,20 +305,16 @@ class genformer(tf.keras.Model):
         atac_x = self.conv_tower_atac(atac_x,training=training)
 
         ### motif activity processing w/ MLP
-        motif_activity = self.motif_activity_LN(motif_activity)
         motif_activity = self.motif_activity_fc1(motif_activity)
         motif_activity = self.motif_dropout1(motif_activity,training=training)
         motif_activity = self.motif_activity_fc2(motif_activity)
-        motif_activity = self.motif_dropout1(motif_activity,training=training)
         motif_activity = tf.tile(motif_activity, [1, self.output_length, 1])
 
         transformer_input = tf.concat([sequence,atac_x, motif_activity], axis=2) # append processed seq,atac,motif inputs in channel dim.
         out_performer,att_matrices = self.performer(transformer_input, training=training)
-        out = self.crop_final(out_performer)
-        out = self.final_pointwise_conv(out, training=training)
+        out = self.final_pointwise_conv(out_performer, training=training)
         out = self.dropout(out, training=training)
         out = self.gelu(out)
-
-        out_profile = self.final_dense_profile(out, training=training)
-
+        out = self.final_dense_profile(out, training=training)
+        out_profile = self.crop_final(out) ## tom crops only on loss, tom will try cropping less 
         return out_profile, att_matrices
