@@ -195,7 +195,7 @@ class genformer(tf.keras.Model):
                                              target_length=self.final_output_length,
                                              name='target_input')
 
-        self.final_pointwise_conv = conv_block(filters=self.filter_list_seq[-1] * self.final_point_scale,
+        self.final_pointwise_conv = conv_block(filters=self.filter_list_seq[-1] // self.final_point_scale,
                                                BN_momentum=self.BN_momentum,
                                                **kwargs,
                                                name = 'final_pointwise')
