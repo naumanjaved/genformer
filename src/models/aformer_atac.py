@@ -31,7 +31,7 @@ class genformer(tf.keras.Model):
                  filter_list_atac: list = [32, 64],
                  final_point_scale: int = 6,
                  num_motifs: int = 693,
-                 motif_dropout_rate: float = 0.20,
+                 motif_dropout_rate: float = 0.25,
                  motif_units_fc: int = 32,
                  name: str = 'genformer',
                  **kwargs):

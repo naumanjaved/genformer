@@ -180,11 +180,11 @@ def main():
             initial_learning_rate=wandb.config.lr_base,
             decay_steps=wandb.config.total_steps*wandb.config.num_epochs, alpha=wandb.config.decay_frac)
         scheduler=optimizers.WarmUp(initial_learning_rate=wandb.config.lr_base,
-                                        warmup_steps=wandb.config.total_steps * 3, # warmup over the first 4 "epochs"
+                                        warmup_steps=wandb.config.total_steps * 3, # warmup over the first 3 "epochs"
                                         decay_schedule_fn=scheduler)
-        optimizer = tf.keras.optimizers.AdamW(learning_rate=scheduler, 
+        optimizer = tf.keras.optimizers.Adam(learning_rate=scheduler, 
                                                 epsilon=wandb.config.epsilon,
-                                                weight_decay=1.0e-05,
+                                                #weight_decay=1.0e-05,
                                                 global_clipnorm=wandb.config.gradient_clip)
         optimizer.exclude_from_weight_decay(var_names = ['bias', 'batch_norm','layer_norm', 
                                                         'BN', 'LN', 'LayerNorm','BatchNorm'])
