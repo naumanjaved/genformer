@@ -82,7 +82,7 @@ def main():
             'loss_type':  str(args.loss_type),
             'total_weight_loss':  float(args.total_weight_loss),
             'use_rot_emb': parse_bool_str(args.use_rot_emb),
-            'restart_step_for_lr_decay': args.restart_step_for_lr_decay,
+            'restart_step_for_lr_decay': int(args.restart_step_for_lr_decay),
             'best_val_loss': float(args.best_val_loss),
             'checkpoint_path': args.checkpoint_path,
             'tpu': args.tpu_name,
@@ -234,16 +234,16 @@ def main():
 
         wandb.config.update({"num_epochs_to_start": 0}, allow_val_change=True)
         if wandb.config.load_init:
-            if not wandb.config.reset_optimizer_lr:
-                status = ckpt.restore(tf.train.latest_checkpoint(wandb.config.checkpoint_path))
-                status.assert_existing_objects_matched()
-                print(optimizer.lr.values[0])
-                print('restored from checkpoint')
-                print('restart training at epoch: ' + str(1+ batch_num.numpy()))
-                print('restart at data batch: ' + str(batch_num.numpy()))
-                wandb.config.update({"num_epochs_to_start": batch_num.numpy()}, 
-                                    allow_val_change=True)
+            status = ckpt.restore(tf.train.latest_checkpoint(wandb.config.checkpoint_path))
+            status.assert_existing_objects_matched()
+            print(optimizer.lr.values[0])
+            print('restored from checkpoint')
+            print('restart training at epoch: ' + str(1+ batch_num.numpy()))
+            print('restart at data batch: ' + str(batch_num.numpy()))
+            wandb.config.update({"num_epochs_to_start": batch_num.numpy()}, 
+                                allow_val_change=True)
             if wandb.config.restart_step_for_lr_decay is not None:
+                print('resetting lr scheduler')
                 optimizer.iterations.assign(int(wandb.config.restart_step_for_lr_decay))
 
         starting_point = wandb.config.num_epochs_to_start % len(train_human_its_mult)
