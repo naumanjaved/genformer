@@ -82,7 +82,7 @@ def main():
             'loss_type':  str(args.loss_type),
             'total_weight_loss':  float(args.total_weight_loss),
             'use_rot_emb': parse_bool_str(args.use_rot_emb),
-            'restart_step_for_lr_decay': int(args.restart_step_for_lr_decay),
+            'restart_step_for_lr_decay': args.restart_step_for_lr_decay,
             'best_val_loss': float(args.best_val_loss),
             'checkpoint_path': args.checkpoint_path,
             'tpu': args.tpu_name,
