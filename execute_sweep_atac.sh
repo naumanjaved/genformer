@@ -41,7 +41,7 @@ python3 train_model_atac.py \
             --log_atac="False" \
             --random_mask_size="1536" \
             --use_atac="True" \
-            --final_point_scale="2" \
+            --final_point_scale="4" \
             --use_seq="True" \
             --atac_corrupt_rate="25" \
             --use_motif_activity="True" \
