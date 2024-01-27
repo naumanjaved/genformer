@@ -28,7 +28,7 @@ def main():
     parser = training_utils.parse_args(parser)
     args = parser.parse_args()
 
-    if (parse_bool_str(args.load_init) & args.checkpoint_path is not None):
+    if (parse_bool_str(args.load_init) and (args.checkpoint_path is not None)):
         input_ckpt = args.checkpoint_path
         seed = input_ckpt.split('_')[-2]
         run_id = input_ckpt.split('_')[-1]
