@@ -1,8 +1,12 @@
 #!/bin/bash -l
 
+export TPU_LOAD_LIBRARY=0
+export TPU_NAME=$1
+export ZONE=$2
+
 python3 train_model_atac.py \
-            --tpu_name="abl1" \
-            --tpu_zone="europe-west4-a" \
+            --tpu_name=$1 \
+            --tpu_zone=$2 \
             --wandb_project="atac_pretraining" \
             --wandb_user="njaved" \
             --wandb_sweep_name="atac_pretraining" \
@@ -24,7 +28,7 @@ python3 train_model_atac.py \
             --model_save_basename="genformer" \
             --lr_base="1.0e-04" \
             --decay_frac="0.10" \
-            --gradient_clip="2.0" \
+            --gradient_clip="1.0" \
             --epsilon=1.0e-8 \
             --num_transformer_layers="3" \
             --dropout_rate="0.20" \
@@ -42,13 +46,13 @@ python3 train_model_atac.py \
             --log_atac="False" \
             --random_mask_size="1536" \
             --use_atac="True" \
-            --final_point_scale="2" \
+            --final_point_scale="4" \
             --use_seq="True" \
-            --seed=25 \
             --val_data_seed=25 \
             --atac_corrupt_rate="25" \
             --use_motif_activity="True" \
             --total_weight_loss="0.15" \
             --use_rot_emb="True" \
             --best_val_loss=100.0 \
-            --loss_type="poisson"
+            --loss_type="poisson" \
+            --seed=25 \

@@ -28,18 +28,36 @@ def main():
     parser = training_utils.parse_args(parser)
     args = parser.parse_args()
 
+    if (parse_bool_str(args.load_init) & args.checkpoint_path is not None):
+        input_ckpt = args.checkpoint_path
+        seed = input_ckpt.split('_')[-2]
+        run_id = input_ckpt.split('_')[-1]
+        num_transformer_layers = input_ckpt.split('_')[-4].split('-')[-1]
+        use_motif_activity=input_ckpt.split('_')[-3].split('-')[-1]
+        filter_list_seq = input_ckpt.split('_')[3:9]
+        filter_list_seq[0] = filter_list_seq[0].split('-')[1]
+        filter_list_seq = ','.join(filter_list_seq)
+        lr_base = '-'.join(input_ckpt.split('_')[2].split('-')[1:])
+    else:
+        seed = args.seed
+        run_id = args.run_id
+        num_transformer_layers = args.num_transformer_layers
+        use_motif_activity=args.use_motif_activity
+        filter_list_seq = args.filter_list_seq
+        lr_base = args.lr_base
+
     #def sweep_train(config_defaults=None):
     strategy = training_utils.tf_tpu_initialize(args.tpu_name,args.tpu_zone) # initialize TPU
     mixed_precision.set_global_policy('mixed_bfloat16')
-    g = tf.random.Generator.from_seed(args.seed) # training data random seed init
+    g = tf.random.Generator.from_seed(seed) # training data random seed init
     g_val = tf.random.Generator.from_seed(args.val_data_seed) # validation data random seed init
 
     mod_run_name = '_'.join([args.model_save_basename,
                                 str(args.input_length / 1000)[:4].rstrip('.') + 'k',
-                            'LR-' + str(args.lr_base),
-                            'C-' + args.filter_list_seq.replace(',','_'),
-                            'T-' + str(args.num_transformer_layers),
-                            'motif-' + str(args.use_motif_activity)])
+                            'LR-' + str(lr_base),
+                            'C-' + filter_list_seq.replace(',','_'),
+                            'T-' + str(num_transformer_layers),
+                            'motif-' + str(use_motif_activity)])
     date_string = f'{datetime.now():%Y-%m-%d %H:%M:%S%z}'
     date_string = date_string.replace(' ','_')
     date_string = f'{datetime.now():%Y-%m-%d %H:%M:%S%z}'
@@ -55,16 +73,16 @@ def main():
             'output_res':  int(args.output_res),
             'dropout_rate':  float(args.dropout_rate),
             'pointwise_dropout_rate':  float(args.pointwise_dropout_rate),
-            'lr_base': float(args.lr_base),
+            'lr_base': float(lr_base),
             'gradient_clip':  float(args.gradient_clip),
             'decay_frac':  float(args.decay_frac),
-            'num_transformer_layers':  int(args.num_transformer_layers),
+            'num_transformer_layers':  int(num_transformer_layers),
             'num_heads':  int(args.num_heads),
             'num_random_features': int(args.num_random_features),
             'kernel_transformation': args.kernel_transformation,
             'epsilon': float(args.epsilon),
             'load_init': parse_bool_str(args.load_init),
-            'filter_list_seq':  [int(x) for x in args.filter_list_seq.split(',')],
+            'filter_list_seq':  [int(x) for x in filter_list_seq],
             'filter_list_atac': [int(x) for x in args.filter_list_atac.split(',')],
             'BN_momentum': float(args.BN_momentum),
             'atac_mask_dropout': float(args.atac_mask_dropout),
@@ -75,10 +93,10 @@ def main():
             'use_seq': parse_bool_str(args.use_seq),
             'random_mask_size': int(args.random_mask_size),
             'final_point_scale': int(args.final_point_scale),
-            'seed': int(args.seed),
+            'seed': int(seed),
             'val_data_seed': int(args.val_data_seed),
             'atac_corrupt_rate':  int(args.atac_corrupt_rate),
-            'use_motif_activity':  parse_bool_str(args.use_motif_activity),
+            'use_motif_activity':  parse_bool_str(use_motif_activity),
             'loss_type':  str(args.loss_type),
             'total_weight_loss':  float(args.total_weight_loss),
             'use_rot_emb': parse_bool_str(args.use_rot_emb),
@@ -101,11 +119,11 @@ def main():
 
     wandb.init(config=config,
                 project= args.wandb_project,
-                id=args.run_id,
+                id=run_id,
                 name = None if not parse_bool_str(args.load_init) else mod_run_name + "_" + str(args.seed),
                 entity=args.wandb_user,
-                resume="allow" if not (parse_bool_str(args.load_init) and (args.run_id is not None)) else "must")
-    run_id_unique = wandb.run.id
+                resume="allow" if not (parse_bool_str(args.load_init) and (run_id is not None)) else "must")
+    run_id_unique = wandb.run.id if run_id is None else run_id
     print('run_id:' + run_id_unique)
     wandb.run.name = mod_run_name + "_" + str(args.seed) + "_" + run_id_unique
 
