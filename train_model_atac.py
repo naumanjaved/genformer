@@ -29,8 +29,8 @@ def main():
     args = parser.parse_args()
 
     if (parse_bool_str(args.load_init) and (args.checkpoint_path is not None)):
-        input_ckpt = args.checkpoint_path
-        seed = input_ckpt.split('_')[-2]
+        input_ckpt = args.checkpoint_path.split('/')[-1]
+        seed = int(input_ckpt.split('_')[-2])
         run_id = input_ckpt.split('_')[-1]
         num_transformer_layers = input_ckpt.split('_')[-4].split('-')[-1]
         use_motif_activity=input_ckpt.split('_')[-3].split('-')[-1]
@@ -82,7 +82,7 @@ def main():
             'kernel_transformation': args.kernel_transformation,
             'epsilon': float(args.epsilon),
             'load_init': parse_bool_str(args.load_init),
-            'filter_list_seq':  [int(x) for x in filter_list_seq],
+            'filter_list_seq':  [int(x) for x in filter_list_seq.split(',')],
             'filter_list_atac': [int(x) for x in args.filter_list_atac.split(',')],
             'BN_momentum': float(args.BN_momentum),
             'atac_mask_dropout': float(args.atac_mask_dropout),
