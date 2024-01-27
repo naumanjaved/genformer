@@ -1,8 +1,12 @@
 #!/bin/bash -l
 
+export TPU_LOAD_LIBRARY=0
+export TPU_NAME=$1
+export ZONE=$2
+
 python3 train_model_atac.py \
-            --tpu_name="pod1" \
-            --tpu_zone="europe-west4-a" \
+            --tpu_name=$1 \
+            --tpu_zone=$2 \
             --wandb_project="atac_pretraining" \
             --wandb_user="njaved" \
             --wandb_sweep_name="atac_pretraining" \
