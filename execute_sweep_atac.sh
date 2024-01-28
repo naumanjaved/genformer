@@ -49,7 +49,7 @@ python3 train_model_atac.py \
             --use_rot_emb="True" \
             --best_val_loss=100.0 \
             --loss_type="poisson" \
-            --num_epochs=50 \
+            --num_epochs=48 \
             --lr_base="3.0e-04" \
             --decay_frac="0.10" \
             --gradient_clip="2.0" \
