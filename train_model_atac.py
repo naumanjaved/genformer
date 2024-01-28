@@ -116,7 +116,8 @@ def main():
             'max_shift': int(args.max_shift),
             'crop_size': (int(args.output_length) - int(args.final_output_length))//2,
             'reset_optimizer_state': parse_bool_str(args.reset_optimizer_state),
-            'warmup_fraction': float(args.warmup_frac)
+            'warmup_fraction': float(args.warmup_frac),
+            'return_constant_lr': parse_bool_str(args.return_constant_lr)
     }
 
     wandb.init(config=config,
@@ -146,11 +147,11 @@ def main():
         GLOBAL_BATCH_SIZE = BATCH_SIZE_PER_REPLICA*NUM_REPLICAS # num total examples per step across all replicas
         print('global batch size:', GLOBAL_BATCH_SIZE)
 
-        wandb.config.update({"train_steps": 1 + (34021 * 16 // (GLOBAL_BATCH_SIZE))},
+        wandb.config.update({"train_steps": 1 + (34021 * 32 // (GLOBAL_BATCH_SIZE))},
                             allow_val_change=True)
         wandb.config.update({"val_steps_ho" : wandb.config.val_examples_ho // GLOBAL_BATCH_SIZE},
                             allow_val_change=True)
-        wandb.config.update({"total_steps": 1 + (34021 * 16 // GLOBAL_BATCH_SIZE)},
+        wandb.config.update({"total_steps": 1 + (34021 * 32 // GLOBAL_BATCH_SIZE)},
                             allow_val_change=True)
         # create the dataset iterators, one for training, one for holdout validation  
         train_human_its, data_val_ho = \
@@ -195,6 +196,8 @@ def main():
 
         # initialize optimizer with warmup and cosine decay
         init_learning_rate=1.0e-06
+        current_lr = tf.Variable(init_learning_rate, name="batch_num")
+
         optimizer = tf.keras.optimizers.Adam(learning_rate=init_learning_rate, 
                                                 epsilon=wandb.config.epsilon,
                                                 global_clipnorm=wandb.config.gradient_clip)
@@ -205,7 +208,8 @@ def main():
         batch_num = tf.Variable(0, name="batch_num")
         ckpt = tf.train.Checkpoint(batch_num=batch_num,
                                     optimizer=optimizer,
-                                    model=model)
+                                    model=model,
+                                    current_lr=current_lr)
         
         checkpoint_dir = os.path.join(wandb.config.model_save_dir, wandb.run.name)
         if wandb.config.load_init:
@@ -247,7 +251,6 @@ def main():
         wandb.config.update({"num_epochs_to_start": 0}, allow_val_change=True)
         if wandb.config.load_init:
             status = ckpt.restore(tf.train.latest_checkpoint(wandb.config.checkpoint_path))
-            #status.assert_existing_objects_matched()
             print('restored from checkpoint')
             print('restart training at epoch: ' + str(1+ batch_num.numpy()))
             print('restart at data batch: ' + str(batch_num.numpy()))
@@ -262,25 +265,27 @@ def main():
         for epoch_i in range(starting_point, len(train_human_its_mult) + 1):
             step_num = (wandb.config.num_epochs_to_start + local_epoch) * \
                             wandb.config.train_steps * GLOBAL_BATCH_SIZE
-            if (wandb.config.reset_optimizer_state and (local_epoch == 0)):
-                print('restart optimizer learning rate decay')
-                optimizer_step = 0
-            else:
-                optimizer_step = step_num
+            if (local_epoch == 0):
+                if (wandb.config.reset_optimizer_state):
+                    print('restart optimizer learning rate schedule')
+                    current_optimizer_step = 0
+                else:
+                    current_optimizer_step = step_num
 
             print('starting epoch_' + str(1 + wandb.config.num_epochs_to_start + local_epoch) + \
                         ' at step: ' + str(step_num))
             start = time.time()
 
             for k in range(wandb.config.train_steps):
-                current_optimizer_step = k + optimizer_step
+                current_optimizer_step += k 
                 lr = schedulers.cos_w_warmup(current_optimizer_step, wandb.config.lr_base,
-                                             (wandb.config.warmup_fraction*wandb.config.total_steps),
-                                             wandb.config.total_steps*wandb.config.num_epochs,
-                                             0.10)
+                                             (wandb.config.warmup_fraction*wandb.config.total_steps*GLOBAL_BATCH_SIZE),
+                                             wandb.config.total_steps*wandb.config.num_epochs*GLOBAL_BATCH_SIZE,
+                                             0.10,
+                                             wandb.config.return_constant_lr)
                 optimizer.lr.assign(lr)
                 optimizer.learning_rate.assign(lr)
-                if k % 500:
+                if (k % 500 == 0):
                     print('lr at:' + str(optimizer.lr.values[0]))
                 strategy.run(train_step, args=(next(train_human_its_mult[epoch_i]),))
 

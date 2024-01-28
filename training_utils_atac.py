@@ -403,7 +403,7 @@ def return_dataset(gcs_path, split, batch, input_length, output_length_ATAC,
         list_files = tf.io.gfile.glob(os.path.join(gcs_path, split, wc))
         random.Random(seed).shuffle(list_files)
         # Divide list_files into smaller subsets
-        subset_size = 16 
+        subset_size = 32 
         files_subsets = [list_files[i:i + subset_size] for i in range(0, len(list_files), subset_size)]
         iterators_list = []
         for files in files_subsets:
@@ -593,6 +593,7 @@ def parse_args(parser):
     parser.add_argument('--run_id', type=str, default=None)
     parser.add_argument('--warmup_frac', type=float, default=1.0)
     parser.add_argument('--reset_optimizer_state',type=str, default="False", help= 'reset_optimizer_state')
+    parser.add_argument('--return_constant_lr',type=str, default="False", help= 'return_constant_lr')
     args = parser.parse_args()
     return parser
 
