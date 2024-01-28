@@ -34,7 +34,7 @@ def main():
         run_id = input_ckpt.split('_')[-1]
         num_transformer_layers = input_ckpt.split('_')[-4].split('-')[-1]
         use_motif_activity=input_ckpt.split('_')[-3].split('-')[-1]
-        filter_list_seq = input_ckpt.split('_')[3:9]
+        filter_list_seq = input_ckpt.split('_')[-10:-4]
         filter_list_seq[0] = filter_list_seq[0].split('-')[1]
         filter_list_seq = ','.join(filter_list_seq)
         lr_base = '-'.join(input_ckpt.split('_')[2].split('-')[1:])
