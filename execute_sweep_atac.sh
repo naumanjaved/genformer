@@ -54,7 +54,9 @@ python3 train_model_atac.py \
             --decay_frac="0.10" \
             --gradient_clip="2.0" \
             --load_init="False" \
+            --seed=13 \
+            --val_data_seed=25 \
+            --restart_data_batches="True" \
+            --reset_optimizer_state="True" \
             --model_save_basename="genformer" \
             --warmup_frac=0.25 \
-            --seed=13 \
-            --val_data_seed=25
