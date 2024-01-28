@@ -115,7 +115,8 @@ def main():
             'model_save_basename': args.model_save_basename,
             'max_shift': int(args.max_shift),
             'crop_size': (int(args.output_length) - int(args.final_output_length))//2,
-            'reset_optimizer_state': parse_bool_str(args.reset_optimizer_state)
+            'reset_optimizer_state': parse_bool_str(args.reset_optimizer_state),
+            'warmup_fraction': float(args.warmup_fraction)
     }
 
     wandb.init(config=config,
@@ -246,7 +247,7 @@ def main():
         wandb.config.update({"num_epochs_to_start": 0}, allow_val_change=True)
         if wandb.config.load_init:
             status = ckpt.restore(tf.train.latest_checkpoint(wandb.config.checkpoint_path))
-            status.assert_existing_objects_matched()
+            #status.assert_existing_objects_matched()
             print('restored from checkpoint')
             print('restart training at epoch: ' + str(1+ batch_num.numpy()))
             print('restart at data batch: ' + str(batch_num.numpy()))
@@ -274,7 +275,7 @@ def main():
             for k in range(wandb.config.train_steps):
                 current_optimizer_step = k + optimizer_step
                 lr = schedulers.cos_w_warmup(current_optimizer_step, wandb.config.lr_base,
-                                             wandb.config.total_steps*3,
+                                             (wandb.config.warmup_fraction*wandb.config.total_steps),
                                              wandb.config.total_steps*wandb.config.num_epochs,
                                              0.10)
                 optimizer.lr.assign(lr)

@@ -50,10 +50,11 @@ python3 train_model_atac.py \
             --best_val_loss=100.0 \
             --loss_type="poisson" \
             --num_epochs=50 \
-            --load_init="False" \
-            --model_save_basename="genformer" \
             --lr_base="1.0e-04" \
             --decay_frac="0.10" \
             --gradient_clip="1.0" \
+            --load_init="False" \
+            --model_save_basename="genformer" \
+            --warmup_frac=0.25 \
             --seed=13 \
             --val_data_seed=25

@@ -7,6 +7,39 @@ import tensorflow as tf
 
 from tensorflow.keras import layers as kl
 
+
+def cos_w_warmup(current_step, 
+                target_warmup, 
+                warmup_steps, 
+                decay_steps, 
+                alpha):
+    """
+    Computes the learning rate based on a linear warm-up and cosine decay.
+
+    :param step: Current training step.
+    :param target_warmup: Target learning rate at the end of the warm-up.
+    :param warmup_steps: Number of steps over which to warm up the learning rate.
+    :param decay_steps: Total number of steps over which to apply the cosine decay.
+    :param alpha: Decay fraction for the learning rate.
+    :return: Computed learning rate for the given step.
+    """
+    initial_learning_rate = 0.001 * target_warmup  # 0.1% of the target warm-up rate
+
+    if current_step < warmup_steps:
+        # Linear warm-up phase
+        completed_fraction = current_step / warmup_steps
+        total_delta = target_warmup - initial_learning_rate
+        lr = initial_learning_rate + completed_fraction * total_delta
+    else:
+        # Decay phase
+        decay_step = min(current_step - warmup_steps, decay_steps)
+        cosine_decay = 0.5 * (1 + np.cos(np.pi * decay_step / decay_steps))
+        decayed = (1 - alpha) * cosine_decay + alpha
+        lr = target_warmup * decayed
+
+    return lr
+
+
 @tf.keras.utils.register_keras_serializable()
 class cosine_decay_w_warmup(tf.keras.optimizers.schedules.LearningRateSchedule):
     """Cosine decay schedule with warm up period.
