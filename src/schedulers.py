@@ -12,7 +12,8 @@ def cos_w_warmup(current_step,
                 target_warmup, 
                 warmup_steps, 
                 decay_steps, 
-                alpha):
+                alpha,
+                return_constant=False):
     """
     Computes the learning rate based on a linear warm-up and cosine decay.
 
@@ -36,6 +37,9 @@ def cos_w_warmup(current_step,
         cosine_decay = 0.5 * (1 + np.cos(np.pi * decay_step / decay_steps))
         decayed = (1 - alpha) * cosine_decay + alpha
         lr = target_warmup * decayed
+
+    if return_constant:
+        return target_warmup
 
     return lr
 
