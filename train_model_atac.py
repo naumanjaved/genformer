@@ -116,7 +116,7 @@ def main():
             'max_shift': int(args.max_shift),
             'crop_size': (int(args.output_length) - int(args.final_output_length))//2,
             'reset_optimizer_state': parse_bool_str(args.reset_optimizer_state),
-            'warmup_fraction': float(args.warmup_fraction)
+            'warmup_fraction': float(args.warmup_frac)
     }
 
     wandb.init(config=config,
