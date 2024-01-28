@@ -258,6 +258,8 @@ def main():
                                 allow_val_change=True)
 
             starting_point = wandb.config.num_epochs_to_start % len(train_human_its_mult)
+        else:
+            starting_point = 0
 
         local_epoch = 0
         print(wandb.config)
