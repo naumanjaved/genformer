@@ -37,7 +37,7 @@ def main():
         filter_list_seq = input_ckpt.split('_')[-10:-4]
         filter_list_seq[0] = filter_list_seq[0].split('-')[1]
         filter_list_seq = ','.join(filter_list_seq)
-        lr_base = '-'.join(input_ckpt.split('_')[2].split('-')[1:])
+        lr_base = '-'.join(input_ckpt.split('_')[-11].split('-')[1:])
     else:
         seed = args.seed
         run_id = args.run_id
