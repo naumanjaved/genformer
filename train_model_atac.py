@@ -255,7 +255,6 @@ def main():
         if wandb.config.load_init:
             status = ckpt.restore(tf.train.latest_checkpoint(wandb.config.checkpoint_path))
             status.assert_existing_objects_matched()
-            print(optimizer.lr.values[0])
             print('restored from checkpoint')
             print('restart training at epoch: ' + str(1+ batch_num.numpy()))
             print('restart at data batch: ' + str(batch_num.numpy()))
@@ -276,6 +275,8 @@ def main():
                                                         global_clipnorm=wandb.config.gradient_clip)
                 optimizer.exclude_from_weight_decay(var_names = ['bias', 'batch_norm','layer_norm', 
                                                                 'BN', 'LN', 'LayerNorm','BatchNorm'])
+                print('fully resetting optimizer state')
+            print(optimizer.lr.values[0])
 
         starting_point = wandb.config.num_epochs_to_start % len(train_human_its_mult)
         local_epoch = 0
