@@ -115,6 +115,7 @@ def main():
             'model_save_basename': args.model_save_basename,
             'max_shift': int(args.max_shift),
             'crop_size': (int(args.output_length) - int(args.final_output_length))//2
+            'reset_optimizer_state': parse_bool_str(args.reset_optimizer_state)
     }
 
     wandb.init(config=config,
@@ -263,6 +264,18 @@ def main():
             if wandb.config.restart_step_for_lr_decay is not None:
                 print('resetting lr scheduler')
                 optimizer.iterations.assign(int(wandb.config.restart_step_for_lr_decay))
+            if wandb.config.reset_optimizer_state:
+                scheduler = tf.keras.optimizers.schedules.CosineDecay(
+                    initial_learning_rate=wandb.config.lr_base,
+                    decay_steps=wandb.config.total_steps*wandb.config.num_epochs, alpha=wandb.config.decay_frac)
+                scheduler=optimizers.WarmUp(initial_learning_rate=wandb.config.lr_base,
+                                                warmup_steps=wandb.config.total_steps * 3, # warmup over the first 3 "epochs"
+                                                decay_schedule_fn=scheduler)
+                optimizer = tf.keras.optimizers.Adam(learning_rate=scheduler, 
+                                                        epsilon=wandb.config.epsilon,
+                                                        global_clipnorm=wandb.config.gradient_clip)
+                optimizer.exclude_from_weight_decay(var_names = ['bias', 'batch_norm','layer_norm', 
+                                                                'BN', 'LN', 'LayerNorm','BatchNorm'])
 
         starting_point = wandb.config.num_epochs_to_start % len(train_human_its_mult)
         local_epoch = 0
