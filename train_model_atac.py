@@ -151,8 +151,6 @@ def main():
                             allow_val_change=True)
         wandb.config.update({"total_steps": 1 + (34021 * 16 // GLOBAL_BATCH_SIZE)},
                             allow_val_change=True)
-        print(wandb.config)
-
         # create the dataset iterators, one for training, one for holdout validation  
         train_human_its, data_val_ho = \
                 training_utils.return_distributed_iterators(wandb.config.gcs_path, wandb.config.gcs_path_holdout,
@@ -278,6 +276,7 @@ def main():
                 print('fully resetting optimizer state')
             print(optimizer.lr.values[0])
 
+        print(wandb.config)
         starting_point = wandb.config.num_epochs_to_start % len(train_human_its_mult)
         local_epoch = 0
 
