@@ -591,7 +591,7 @@ def parse_args(parser):
     parser.add_argument('--use_rot_emb',type=str, default="True", help= 'use_rot_emb')
     parser.add_argument('--best_val_loss', type=float, default=0.09113)
     parser.add_argument('--run_id', type=str, default=None)
-    parser.add_argument('--warmup_fraction', type=float, default=1.0)
+    parser.add_argument('--warmup_frac', type=float, default=1.0)
     parser.add_argument('--reset_optimizer_state',type=str, default="False", help= 'reset_optimizer_state')
     args = parser.parse_args()
     return parser
