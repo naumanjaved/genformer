@@ -114,7 +114,7 @@ def main():
             'model_save_dir': args.model_save_dir,
             'model_save_basename': args.model_save_basename,
             'max_shift': int(args.max_shift),
-            'crop_size': (int(args.output_length) - int(args.final_output_length))//2
+            'crop_size': (int(args.output_length) - int(args.final_output_length))//2,
             'reset_optimizer_state': parse_bool_str(args.reset_optimizer_state)
     }
 
