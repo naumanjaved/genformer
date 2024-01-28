@@ -117,8 +117,7 @@ def main():
             'crop_size': (int(args.output_length) - int(args.final_output_length))//2,
             'reset_optimizer_state': parse_bool_str(args.reset_optimizer_state),
             'warmup_fraction': float(args.warmup_frac),
-            'return_constant_lr': parse_bool_str(args.return_constant_lr),
-            'restart_data_batches': parse_bool_str(args.restart_data_batches),
+            'return_constant_lr': parse_bool_str(args.return_constant_lr)
     }
 
     wandb.init(config=config,
@@ -259,7 +258,7 @@ def main():
                                 allow_val_change=True)
 
             starting_point = wandb.config.num_epochs_to_start % len(train_human_its_mult)
-            
+
         local_epoch = 0
         print(wandb.config)
         
