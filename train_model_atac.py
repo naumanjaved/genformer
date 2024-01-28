@@ -13,6 +13,7 @@ os.environ['TF_ENABLE_EAGER_CLIENT_STREAMING_ENQUEUE']='False'
 import src.models.aformer_atac as genformer # can toggle which model you want here
 import src.optimizers as optimizers
 import training_utils_atac as training_utils
+import src.schedulers as schedulers
 
 # Function to parse boolean string values
 def parse_bool_str(input_str):
@@ -100,7 +101,6 @@ def main():
             'loss_type':  str(args.loss_type),
             'total_weight_loss':  float(args.total_weight_loss),
             'use_rot_emb': parse_bool_str(args.use_rot_emb),
-            'restart_step_for_lr_decay': args.restart_step_for_lr_decay,
             'best_val_loss': float(args.best_val_loss),
             'checkpoint_path': args.checkpoint_path,
             'tpu': args.tpu_name,
@@ -193,15 +193,9 @@ def main():
         print('initialized model')
 
         # initialize optimizer with warmup and cosine decay
-        scheduler = tf.keras.optimizers.schedules.CosineDecay(
-            initial_learning_rate=wandb.config.lr_base,
-            decay_steps=wandb.config.total_steps*wandb.config.num_epochs, alpha=wandb.config.decay_frac)
-        scheduler=optimizers.WarmUp(initial_learning_rate=wandb.config.lr_base,
-                                        warmup_steps=wandb.config.total_steps * 3, # warmup over the first 3 "epochs"
-                                        decay_schedule_fn=scheduler)
-        optimizer = tf.keras.optimizers.Adam(learning_rate=scheduler, 
+        init_learning_rate=1.0e-06
+        optimizer = tf.keras.optimizers.Adam(learning_rate=init_learning_rate, 
                                                 epsilon=wandb.config.epsilon,
-                                                #weight_decay=1.0e-05,
                                                 global_clipnorm=wandb.config.gradient_clip)
         optimizer.exclude_from_weight_decay(var_names = ['bias', 'batch_norm','layer_norm', 
                                                         'BN', 'LN', 'LayerNorm','BatchNorm'])
@@ -258,22 +252,6 @@ def main():
             print('restart at data batch: ' + str(batch_num.numpy()))
             wandb.config.update({"num_epochs_to_start": batch_num.numpy()}, 
                                 allow_val_change=True)
-            if wandb.config.restart_step_for_lr_decay is not None:
-                print('resetting lr scheduler')
-                optimizer.iterations.assign(int(wandb.config.restart_step_for_lr_decay))
-            if wandb.config.reset_optimizer_state:
-                scheduler = tf.keras.optimizers.schedules.CosineDecay(
-                    initial_learning_rate=wandb.config.lr_base,
-                    decay_steps=wandb.config.total_steps*wandb.config.num_epochs, alpha=wandb.config.decay_frac)
-                scheduler=optimizers.WarmUp(initial_learning_rate=wandb.config.lr_base,
-                                                warmup_steps=wandb.config.total_steps * 3, # warmup over the first 3 "epochs"
-                                                decay_schedule_fn=scheduler)
-                optimizer = tf.keras.optimizers.Adam(learning_rate=scheduler, 
-                                                        epsilon=wandb.config.epsilon,
-                                                        global_clipnorm=wandb.config.gradient_clip)
-                optimizer.exclude_from_weight_decay(var_names = ['bias', 'batch_norm','layer_norm', 
-                                                                'BN', 'LN', 'LayerNorm','BatchNorm'])
-                print('fully resetting optimizer state')
             print(optimizer.lr.values[0])
 
         print(wandb.config)
@@ -283,12 +261,26 @@ def main():
         for epoch_i in range(starting_point, len(train_human_its_mult) + 1):
             step_num = (wandb.config.num_epochs_to_start + local_epoch) * \
                             wandb.config.train_steps * GLOBAL_BATCH_SIZE
-                        
+            if (wandb.config.reset_optimizer_state and (local_epoch == 0)):
+                print('restart optimizer learning rate decay')
+                optimizer_step = 0
+            else:
+                optimizer_step = step_num
+
             print('starting epoch_' + str(1 + wandb.config.num_epochs_to_start + local_epoch) + \
                         ' at step: ' + str(step_num))
             start = time.time()
 
             for k in range(wandb.config.train_steps):
+                current_optimizer_step = k + optimizer_step
+                lr = schedulers.cos_w_warmup(current_optimizer_step, wandb.config.lr_base,
+                                             wandb.config.total_steps*3,
+                                             wandb.config.total_steps*wandb.config.num_epochs,
+                                             0.10)
+                optimizer.lr.assign(lr)
+                optimizer.learning_rate.assign(lr)
+                if k % 500:
+                    print('lr at:' + str(optimizer.lr.values[0]))
                 strategy.run(train_step, args=(next(train_human_its_mult[epoch_i]),))
 
             train_loss = metric_dict['train_loss'].result().numpy() * NUM_REPLICAS # multiply by NUM_REPLICAS to get total loss
@@ -300,10 +292,8 @@ def main():
                         'ATAC_R2_tr': metric_dict['ATAC_R2_tr'].result()['R2'].numpy()},
                         step=step_num)
             duration = (time.time() - start) / 60.
-
             print('completed epoch ' + str(1 + wandb.config.num_epochs_to_start + local_epoch) + ' - duration(mins): ' + str(duration))
-            print('lr at:' + str(optimizer.lr.values[0]))
-            print('optimizer iterations at :' + str(optimizer.iterations.values[0]))
+
             # main validation step:
             # - run the validation loop
             # - return the true and predicted values to allow for plotting and other metrics
