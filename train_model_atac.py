@@ -196,8 +196,6 @@ def main():
 
         # initialize optimizer with warmup and cosine decay
         init_learning_rate=1.0e-06
-        current_lr = tf.Variable(init_learning_rate, name="current_lr")
-
         optimizer = tf.keras.optimizers.Adam(learning_rate=init_learning_rate, 
                                                 epsilon=wandb.config.epsilon,
                                                 global_clipnorm=wandb.config.gradient_clip)
@@ -206,10 +204,11 @@ def main():
         metric_dict = {} # initialize dictionary to store metrics
 
         batch_num = tf.Variable(0, name="batch_num")
+        optimizer_step_track = tf.Variable(0, name="optimizer_step_track")
         ckpt = tf.train.Checkpoint(batch_num=batch_num,
                                     optimizer=optimizer,
                                     model=model,
-                                    current_lr=current_lr)
+                                    optimizer_step_track=optimizer_step_track)
         
         checkpoint_dir = os.path.join(wandb.config.model_save_dir, wandb.run.name)
         if wandb.config.load_init:
@@ -287,10 +286,10 @@ def main():
                                              wandb.config.return_constant_lr)
                 optimizer.lr.assign(lr)
                 optimizer.learning_rate.assign(lr)
-                current_lr.assign(lr)
+                
                 strategy.run(train_step, args=(next(train_human_its_mult[epoch_i]),))
+            optimizer_step_track.assign(current_optimizer_step)
             print('lr at:' + str(optimizer.lr.values[0]))
-
             train_loss = metric_dict['train_loss'].result().numpy() * NUM_REPLICAS # multiply by NUM_REPLICAS to get total loss
             print('train_loss: ' + str(train_loss))
 
