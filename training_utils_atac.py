@@ -403,7 +403,7 @@ def return_dataset(gcs_path, split, batch, input_length, output_length_ATAC,
         list_files = tf.io.gfile.glob(os.path.join(gcs_path, split, wc))
         random.Random(seed).shuffle(list_files)
         # Divide list_files into smaller subsets
-        subset_size = 32 
+        subset_size = 16
         files_subsets = [list_files[i:i + subset_size] for i in range(0, len(list_files), subset_size)]
         iterators_list = []
         for files in files_subsets:

@@ -147,11 +147,11 @@ def main():
         GLOBAL_BATCH_SIZE = BATCH_SIZE_PER_REPLICA*NUM_REPLICAS # num total examples per step across all replicas
         print('global batch size:', GLOBAL_BATCH_SIZE)
 
-        wandb.config.update({"train_steps": 1 + (34021 * 32 // (GLOBAL_BATCH_SIZE))},
+        wandb.config.update({"train_steps": 1 + (34021 * 16 // (GLOBAL_BATCH_SIZE))},
                             allow_val_change=True)
         wandb.config.update({"val_steps_ho" : wandb.config.val_examples_ho // GLOBAL_BATCH_SIZE},
                             allow_val_change=True)
-        wandb.config.update({"total_steps": 1 + (34021 * 32 // GLOBAL_BATCH_SIZE)},
+        wandb.config.update({"total_steps": 1 + (34021 * 16 // GLOBAL_BATCH_SIZE)},
                             allow_val_change=True)
         # create the dataset iterators, one for training, one for holdout validation  
         train_human_its, data_val_ho = \
@@ -288,9 +288,8 @@ def main():
                 optimizer.lr.assign(lr)
                 optimizer.learning_rate.assign(lr)
                 current_lr.assign(lr)
-                if (k % 500 == 0):
-                    print('lr at:' + str(optimizer.lr.values[0]))
                 strategy.run(train_step, args=(next(train_human_its_mult[epoch_i]),))
+            print('lr at:' + str(optimizer.lr.values[0]))
 
             train_loss = metric_dict['train_loss'].result().numpy() * NUM_REPLICAS # multiply by NUM_REPLICAS to get total loss
             print('train_loss: ' + str(train_loss))
