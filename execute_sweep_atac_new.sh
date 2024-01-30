@@ -18,7 +18,7 @@ python3 train_model_atac.py \
             --output_length_ATAC=131072 \
             --final_output_length=4092 \
             --max_shift=4 \
-            --batch_size=4 \
+            --batch_size=1 \
             --val_examples_ho=38880 \
             --BN_momentum=0.90 \
             --patience=50 \
@@ -34,7 +34,7 @@ python3 train_model_atac.py \
             --kernel_transformation="relu_kernel_transformation" \
             --savefreq=1 \
             --rectify="True" \
-            --filter_list_seq="512,512,640,768,896,1024" \
+            --filter_list_seq="512,512,768,768,1024,1024" \
             --filter_list_atac="32,64" \
             --atac_mask_dropout=0.15 \
             --atac_mask_dropout_val=0.15 \
@@ -49,7 +49,7 @@ python3 train_model_atac.py \
             --use_rot_emb="True" \
             --best_val_loss=100.0 \
             --num_epochs=15 \
-            --lr_base="5.0e-04" \
+            --lr_base="2.0e-04" \
             --decay_frac="0.10" \
             --gradient_clip="5.0" \
             --seed=1 \
