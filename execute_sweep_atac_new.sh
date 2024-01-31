@@ -48,7 +48,6 @@ python3 train_model_atac.py \
             --total_weight_loss="0.15" \
             --use_rot_emb="True" \
             --best_val_loss=100.0 \
-            --num_epochs=10 \
             --lr_base="5.0e-04" \
             --decay_frac="0.10" \
             --gradient_clip="10.0" \
@@ -56,5 +55,5 @@ python3 train_model_atac.py \
             --val_data_seed=1 \
             --loss_type="poisson" \
             --model_save_basename="genformer" \
-            --warmup_frac=1.0 \
-            --decay_steps=50000
+            --warmup_frac=2.0 \
+            --decay_steps=100000
