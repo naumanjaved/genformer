@@ -550,6 +550,7 @@ def parse_args(parser):
     parser.add_argument('--model_save_basename', type=str)
     parser.add_argument('--max_shift', default=10, type=int)
     parser.add_argument('--output_res', default=128, type=int)
+    parser.add_argument('--decay_steps', default=88*34021*16, type=int)
     parser.add_argument('--lr_base', default="1.0e-03", help='lr_base')
     parser.add_argument('--decay_frac', type=str, help='decay_frac')
     parser.add_argument('--input_length', type=int, default=196608, help='input_length')
