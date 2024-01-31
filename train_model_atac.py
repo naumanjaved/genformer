@@ -168,7 +168,7 @@ def main():
                                                             wandb.config.val_steps_ho, wandb.config.use_motif_activity,
                                                             g, g_val)
         
-        train_human_its_mult = train_human_its * 4
+        train_human_its_mult = train_human_its
 
         print('created dataset iterators')
         # initialize model
