@@ -86,6 +86,7 @@ def main():
             'filter_list_seq':  [int(x) for x in filter_list_seq.split(',')],
             'filter_list_atac': [int(x) for x in args.filter_list_atac.split(',')],
             'BN_momentum': float(args.BN_momentum),
+            'num_epochs': int(args.num_epochs),
             'atac_mask_dropout': float(args.atac_mask_dropout),
             'atac_mask_dropout_val': float(args.atac_mask_dropout_val),
             'rectify': parse_bool_str(args.rectify),
@@ -159,7 +160,7 @@ def main():
                                                             GLOBAL_BATCH_SIZE, wandb.config.input_length,
                                                             wandb.config.max_shift, wandb.config.output_length_ATAC,
                                                             wandb.config.output_length, wandb.config.crop_size,
-                                                            wandb.config.output_res, args.num_parallel, 200,
+                                                            wandb.config.output_res, args.num_parallel, 48,
                                                             strategy, options,options_val, wandb.config.atac_mask_dropout,
                                                             wandb.config.atac_mask_dropout_val,
                                                             wandb.config.random_mask_size, wandb.config.log_atac,
@@ -256,35 +257,32 @@ def main():
             wandb.config.update({"num_epochs_to_start": batch_num.numpy()}, 
                                 allow_val_change=True)
 
-            starting_point = wandb.config.num_epochs_to_start % len(train_human_its_mult)
-        else:
-            starting_point = 0
-
         local_epoch = 0
         print(wandb.config)
         
-        for epoch_i in range(starting_point, len(train_human_its_mult) + 1):
-            step_num = (wandb.config.num_epochs_to_start + local_epoch) * \
+        for epoch_idx in range(wandb.config.num_epochs):
+            epoch_i = (epoch_idx + wandb.config.num_epochs_to_start) % len(train_human_its_mult)
+            step_num = (wandb.config.num_epochs_to_start + epoch_idx) * \
                             wandb.config.train_steps * GLOBAL_BATCH_SIZE
-            if (local_epoch == 0):
+            if (epoch_idx == 0):
                 if (wandb.config.reset_optimizer_state):
                     print('restart optimizer learning rate schedule')
                     current_optimizer_step = 0
                 else:
                     current_optimizer_step = step_num//GLOBAL_BATCH_SIZE
 
-            print('starting epoch_' + str(1 + wandb.config.num_epochs_to_start + local_epoch) + \
+            print('starting epoch_' + str(1 + wandb.config.num_epochs_to_start + epoch_idx) + \
                         ' at step: ' + str(step_num))
             start = time.time()
 
             for k in range(wandb.config.train_steps):
-                lr = schedulers.cos_w_warmup(current_optimizer_step, 
+                lr = schedulers.cos_w_warmup(current_optimizer_step,
                                              wandb.config.lr_base,
                                              (wandb.config.warmup_fraction*wandb.config.total_steps),
                                              wandb.config.decay_steps,
                                              wandb.config.decay_frac,
                                              wandb.config.return_constant_lr)
-                if ((k == 0) and (local_epoch == 0)):
+                if ((k == 0) and (epoch_idx == 0)):
                     print('starting lr at:' + str(optimizer.lr.values[0]))
                 optimizer.lr.assign(lr)
                 optimizer.learning_rate.assign(lr)
@@ -302,7 +300,7 @@ def main():
                         'ATAC_R2_tr': metric_dict['ATAC_R2_tr'].result()['R2'].numpy()},
                         step=step_num)
             duration = (time.time() - start) / 60.
-            print('completed epoch ' + str(1 + wandb.config.num_epochs_to_start + local_epoch) + ' - duration(mins): ' + str(duration))
+            print('completed epoch ' + str(1 + wandb.config.num_epochs_to_start + epoch_idx) + ' - duration(mins): ' + str(duration))
 
             # main validation step:
             # - run the validation loop
@@ -324,7 +322,7 @@ def main():
                         step=step_num)
 
             duration = (time.time() - start) / 60.
-            print('completed epoch ' + str(local_epoch + 1 + wandb.config.num_epochs_to_start) + ' validation - duration(mins): ' + str(duration))
+            print('completed epoch ' + str(epoch_idx + 1 + wandb.config.num_epochs_to_start) + ' validation - duration(mins): ' + str(duration))
 
             # Start early stopping checks:
             # - After epoch one if not loading from a checkpoint
@@ -343,14 +341,14 @@ def main():
             ckpt.batch_num.assign_add(1)
             if ((epoch_i+1) % args.savefreq) == 0:
                 save_path = manager.save()
-                print('saving model after: epoch ' + str(1 + wandb.config.num_epochs_to_start + local_epoch))
+                print('saving model after: epoch ' + str(1 + wandb.config.num_epochs_to_start + epoch_idx))
                 print('corresponds to stop point: start at data batch ' + str(epoch_i))
 
             for key, item in metric_dict.items(): # reset metrics for new epoch
                 item.reset_state()
-            local_epoch += 1
+
             if stop_criteria:
-                print('early stopping at: epoch ' + str(1 + wandb.config.num_epochs_to_start + local_epoch))
+                print('early stopping at: epoch ' + str(1 + wandb.config.num_epochs_to_start + epoch_idx))
                 break
 
         print('best model was at: epoch ' + str(best_epoch))

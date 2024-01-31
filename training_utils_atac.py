@@ -443,7 +443,7 @@ def return_dataset(gcs_path, split, batch, input_length, output_length_ATAC,
             deterministic=False,
             num_parallel_calls=tf.data.AUTOTUNE)
 
-        return dataset.take(batch*validation_steps).batch(batch).repeat((num_epoch*2)).prefetch(tf.data.AUTOTUNE)
+        return dataset.take(batch*validation_steps).batch(batch).repeat((num_epoch)).prefetch(tf.data.AUTOTUNE)
 
 def return_distributed_iterators(gcs_path, gcs_path_ho, global_batch_size,
                                  input_length, max_shift, output_length_ATAC,
@@ -592,6 +592,7 @@ def parse_args(parser):
     parser.add_argument('--best_val_loss', type=float, default=0.09113)
     parser.add_argument('--run_id', type=str, default=None)
     parser.add_argument('--warmup_frac', type=float, default=1.0)
+    parser.add_argument('--num_epochs', type=int, default=100)
     parser.add_argument('--reset_optimizer_state',type=str, default="False", help= 'reset_optimizer_state')
     parser.add_argument('--return_constant_lr',type=str, default="False", help= 'return_constant_lr')
     args = parser.parse_args()
