@@ -36,8 +36,8 @@ python3 train_model_atac.py \
             --rectify="True" \
             --filter_list_seq="512,512,640,768,896,896" \
             --filter_list_atac="32,64" \
-            --atac_mask_dropout=0.10 \
-            --atac_mask_dropout_val=0.10 \
+            --atac_mask_dropout=0.15 \
+            --atac_mask_dropout_val=0.15 \
             --log_atac="False" \
             --random_mask_size="1536" \
             --use_atac="True" \
