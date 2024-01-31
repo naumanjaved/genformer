@@ -569,7 +569,7 @@ def parse_args(parser):
     parser.add_argument('--kernel_transformation', type=str, default="relu_kernel_transformation", help='kernel_transformation')
     parser.add_argument('--savefreq', type=int, help='savefreq')
     parser.add_argument('--checkpoint_path', type=str, default=None, help='checkpoint_path')
-    parser.add_argument('--load_init', type=str, default="True", help='load_init')
+    parser.add_argument('--load_init', type=str, default="False", help='load_init')
     parser.add_argument('--normalize', type=str, default="True", help='normalize')
     parser.add_argument('--norm', type=str, default="True", help='norm')
     parser.add_argument('--atac_mask_dropout', type=float, default=0.05, help='atac_mask_dropout')
