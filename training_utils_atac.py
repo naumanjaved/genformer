@@ -414,29 +414,28 @@ def return_dataset(gcs_path, split, batch, input_length, output_length_ATAC,
         list_files = tf.io.gfile.glob(os.path.join(gcs_path, split, wc))
         random.Random(seed).shuffle(list_files)
         # Divide list_files into smaller subsets
-        subset_size = 16
-        files_subsets = [list_files[i:i + subset_size] for i in range(0, len(list_files), subset_size)]
-        iterators_list = []
-        for files in files_subsets:
-            dataset = tf.data.Dataset.list_files(files,seed=seed)
-            dataset = tf.data.TFRecordDataset(dataset, compression_type='ZLIB', num_parallel_reads=tf.data.AUTOTUNE)
-            dataset = dataset.with_options(options)
+        #subset_size = 16
+        #files_subsets = [list_files[i:i + subset_size] for i in range(0, len(list_files), subset_size)]
+        #iterators_list = []
+        #for files in files_subsets:
+        dataset = tf.data.Dataset.list_files(list_files,seed=seed)
+        dataset = tf.data.TFRecordDataset(dataset, compression_type='ZLIB', num_parallel_reads=tf.data.AUTOTUNE)
+        dataset = dataset.with_options(options)
 
-            dataset = dataset.map(
-                lambda record: deserialize_tr(
-                    record,
-                    g, use_motif_activity,
-                    input_length, max_shift,
-                    output_length_ATAC, output_length,
-                    crop_size, output_res,
-                    atac_mask_dropout, random_mask_size,
-                    log_atac, use_atac, use_seq,
-                    atac_corrupt_rate),
-                deterministic=False,
-                num_parallel_calls=tf.data.AUTOTUNE)
+        dataset = dataset.map(
+            lambda record: deserialize_tr(
+                record,
+                g, use_motif_activity,
+                input_length, max_shift,
+                output_length_ATAC, output_length,
+                crop_size, output_res,
+                atac_mask_dropout, random_mask_size,
+                log_atac, use_atac, use_seq,
+                atac_corrupt_rate),
+            deterministic=False,
+            num_parallel_calls=tf.data.AUTOTUNE)
 
-            iterators_list.append(dataset.repeat(3).batch(batch).prefetch(tf.data.AUTOTUNE))
-        return iterators_list
+        return dataset.repeat(3).batch(batch).prefetch(tf.data.AUTOTUNE)
 
     else:
         list_files = (tf.io.gfile.glob(os.path.join(gcs_path, split, wc)))
@@ -467,7 +466,7 @@ def return_distributed_iterators(gcs_path, gcs_path_ho, global_batch_size,
                                  atac_corrupt_rate, 
                                  validation_steps, use_motif_activity, g, g_val):
 
-    tr_iterators = return_dataset(gcs_path, "train", global_batch_size, input_length,
+    tr_iterator = return_dataset(gcs_path, "train", global_batch_size, input_length,
                              output_length_ATAC, output_length, crop_size,
                              output_res, max_shift, options, num_parallel_calls,
                              num_epoch, atac_mask_dropout, random_mask_size,
@@ -484,13 +483,15 @@ def return_distributed_iterators(gcs_path, gcs_path_ho, global_batch_size,
     val_dist_ho=strategy.experimental_distribute_dataset(val_data_ho)
     val_data_ho_it = iter(val_dist_ho)
 
-    dist_iters_list=[]
-    for it in tr_iterators:
-        tr_dist = strategy.experimental_distribute_dataset(it)
-        tr_data_it = iter(tr_dist)
-        dist_iters_list.append(tr_data_it)
+    tr_
 
-    return dist_iters_list, val_data_ho_it
+    #dist_iters_list=[]
+    #for it in tr_iterators:
+    tr_dist = strategy.experimental_distribute_dataset(tr_iterator)
+    tr_data_it = iter(tr_dist)
+    #    dist_iters_list.append(tr_data_it)
+
+    return tr_data_it, val_data_ho_it
 
 def early_stopping(current_val_loss,
                    logged_val_losses,

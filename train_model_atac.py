@@ -31,7 +31,6 @@ def main():
 
     if (parse_bool_str(args.load_init) and (args.checkpoint_path is not None)):
         input_ckpt = args.checkpoint_path.split('/')[-1]
-        seed = int(input_ckpt.split('_')[-2])
         run_id = input_ckpt.split('_')[-1]
         num_transformer_layers = input_ckpt.split('_')[-4].split('-')[-1]
         use_motif_activity=input_ckpt.split('_')[-3].split('-')[-1]
@@ -40,7 +39,6 @@ def main():
         filter_list_seq = ','.join(filter_list_seq)
         lr_base = '-'.join(input_ckpt.split('_')[-11].split('-')[1:])
     else:
-        seed = args.seed
         run_id = args.run_id
         num_transformer_layers = args.num_transformer_layers
         use_motif_activity=args.use_motif_activity
@@ -155,7 +153,7 @@ def main():
         wandb.config.update({"total_steps": 1 + (34021 * 16 // GLOBAL_BATCH_SIZE)},
                             allow_val_change=True)
         # create the dataset iterators, one for training, one for holdout validation  
-        train_human_its, data_val_ho = \
+        train_human_it, data_val_ho = \
                 training_utils.return_distributed_iterators(wandb.config.gcs_path, wandb.config.gcs_path_holdout,
                                                             GLOBAL_BATCH_SIZE, wandb.config.input_length,
                                                             wandb.config.max_shift, wandb.config.output_length_ATAC,
@@ -169,7 +167,7 @@ def main():
                                                             wandb.config.val_steps_ho, wandb.config.use_motif_activity,
                                                             g, g_val)
         
-        train_human_its_mult = train_human_its
+        #train_human_its_mult = train_human_its
 
         print('created dataset iterators')
         # initialize model
@@ -200,7 +198,7 @@ def main():
         optimizer = tf.keras.optimizers.Adam(learning_rate=init_learning_rate, 
                                                 epsilon=wandb.config.epsilon,
                                                 global_clipnorm=wandb.config.gradient_clip)
-        optimizer.exclude_from_weight_decay(var_names = ['bias', 'batch_norm','layer_norm', 
+        optimizer.exclude_from_weight_decay(var_names = ['bias', 'batch_norm','layer_norm',
                                                         'BN', 'LN', 'LayerNorm','BatchNorm'])
         metric_dict = {} # initialize dictionary to store metrics
 
@@ -239,7 +237,6 @@ def main():
         stop_criteria = False
         best_epoch = 0 # track epoch with best validation loss 
 
-        
         print('building model...')
         build_step(data_val_ho)
         total_params = 0
@@ -261,7 +258,7 @@ def main():
         print(wandb.config)
         
         for epoch_idx in range(wandb.config.num_epochs):
-            epoch_i = (epoch_idx + wandb.config.num_epochs_to_start) % len(train_human_its_mult)
+            #epoch_i = (epoch_idx + wandb.config.num_epochs_to_start) % len(train_human_its_mult)
             step_num = (wandb.config.num_epochs_to_start + epoch_idx) * \
                             wandb.config.train_steps * GLOBAL_BATCH_SIZE
             if (epoch_idx == 0):
@@ -286,7 +283,7 @@ def main():
                     print('starting lr at:' + str(optimizer.lr.values[0]))
                 optimizer.lr.assign(lr)
                 optimizer.learning_rate.assign(lr)
-                strategy.run(train_step, args=(next(train_human_its_mult[epoch_i]),))
+                strategy.run(train_step, args=(next(train_human_it),))
                 current_optimizer_step += 1
 
             optimizer_step_track.assign(current_optimizer_step)
@@ -327,7 +324,7 @@ def main():
             # Start early stopping checks:
             # - After epoch one if not loading from a checkpoint
             # - Immediately (epoch 0) if loading from a checkpoint, using the provided best loss
-            if ((wandb.config.num_epochs_to_start+epoch_i+1) > 0 and (not wandb.config.load_init)) or wandb.config.load_init:
+            if ((wandb.config.num_epochs_to_start+epoch_idx+1) > 0 and (not wandb.config.load_init)) or wandb.config.load_init:
                 stop_criteria, patience_counter, best_epoch = \
                     training_utils.early_stopping(
                         current_val_loss=val_losses[-1],             # Last value from val_losses
@@ -339,10 +336,10 @@ def main():
                     )
                 print('patience counter at: ' + str(patience_counter))
             ckpt.batch_num.assign_add(1)
-            if ((epoch_i+1) % args.savefreq) == 0:
+            if ((epoch_idx+1) % args.savefreq) == 0:
                 save_path = manager.save()
                 print('saving model after: epoch ' + str(1 + wandb.config.num_epochs_to_start + epoch_idx))
-                print('corresponds to stop point: start at data batch ' + str(epoch_i))
+                #print('corresponds to stop point: start at data batch ' + str(epoch_i))
 
             for key, item in metric_dict.items(): # reset metrics for new epoch
                 item.reset_state()
