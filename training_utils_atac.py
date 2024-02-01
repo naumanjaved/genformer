@@ -483,8 +483,6 @@ def return_distributed_iterators(gcs_path, gcs_path_ho, global_batch_size,
     val_dist_ho=strategy.experimental_distribute_dataset(val_data_ho)
     val_data_ho_it = iter(val_dist_ho)
 
-    tr_
-
     #dist_iters_list=[]
     #for it in tr_iterators:
     tr_dist = strategy.experimental_distribute_dataset(tr_iterator)
