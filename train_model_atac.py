@@ -31,6 +31,7 @@ def main():
 
     if (parse_bool_str(args.load_init) and (args.checkpoint_path is not None)):
         input_ckpt = args.checkpoint_path.split('/')[-1]
+        seed = args.seed
         run_id = input_ckpt.split('_')[-1]
         num_transformer_layers = input_ckpt.split('_')[-4].split('-')[-1]
         use_motif_activity=input_ckpt.split('_')[-3].split('-')[-1]
@@ -39,6 +40,7 @@ def main():
         filter_list_seq = ','.join(filter_list_seq)
         lr_base = '-'.join(input_ckpt.split('_')[-11].split('-')[1:])
     else:
+        seed = args.seed
         run_id = args.run_id
         num_transformer_layers = args.num_transformer_layers
         use_motif_activity=args.use_motif_activity
