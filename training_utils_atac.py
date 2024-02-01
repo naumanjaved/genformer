@@ -232,7 +232,7 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
     # in case we want to run ablation without these inputs
     if not use_atac:
         print('not using atac')
-        masked_atac = tf.random.stateless_uniform(shape=[output_length_ATAC], minval=0, maxval=150, 
+        masked_atac = tf.random.stateless_uniform(shape=[output_length_ATAC, 1], minval=0, maxval=150, 
                                                       seed=[randomish_seed+1,randomish_seed+3],
                                                       dtype=tf.float32)
 
@@ -380,7 +380,7 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
     # in case we want to run ablation without these inputs
     if not use_atac:
         print('not using atac')
-        masked_atac = tf.random.stateless_uniform(shape=[output_length_ATAC], minval=0, maxval=150, 
+        masked_atac = tf.random.stateless_uniform(shape=[output_length_ATAC, 1], minval=0, maxval=150, 
                                                       seed=[randomish_seed+1,randomish_seed+3],
                                                       dtype=tf.float32)
 
