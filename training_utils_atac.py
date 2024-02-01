@@ -204,7 +204,7 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
                                                 atac_mask_int,
                                                 atac_mask_dropout)
 
-    masked_atac = atac * full_comb_mask ## apply the mask to the input profile 
+    masked_atac = atac * full_comb_mask ## apply the mask to the input profile
 
     if log_atac:
         masked_atac = tf.math.log1p(masked_atac)
@@ -227,16 +227,22 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
     atac_out = tf.reduce_sum(tf.reshape(atac_target, [-1,tiling_req]),axis=1,keepdims=True)
     diff = tf.math.sqrt(tf.nn.relu(atac_out - 2000.0 * tf.ones(atac_out.shape))) # soft clip the targets
     atac_out = tf.clip_by_value(atac_out, clip_value_min=0.0, clip_value_max=2000.0) + diff
-    atac_out = tf.slice(atac_out, [crop_size,0], [output_length-2*crop_size,-1]) # crop to desired length 
+    atac_out = tf.slice(atac_out, [crop_size,0], [output_length-2*crop_size,-1]) # crop to desired length
 
     # in case we want to run ablation without these inputs
     if not use_atac:
         print('not using atac')
-        masked_atac = tf.zeros_like(masked_atac)
+        masked_atac = tf.random.stateless_uniform(shape=[output_length_ATAC], minval=0, maxval=150, 
+                                                      seed=[randomish_seed+1,randomish_seed+3],
+                                                      dtype=tf.float32)
 
     if not use_seq:
         print('not using sequence')
-        sequence = tf.zeros_like(sequence)
+        random_sequence = tf.random.stateless_uniform(shape=[input_length], minval=0, maxval=4, 
+                                                      seed=[randomish_seed+21,randomish_seed+2],
+                                                      dtype=tf.int32)
+        random_one_hot = tf.one_hot(random_sequence, depth=4)
+        sequence = random_one_hot
 
     #print('low level sequence masking')
     #sequence = mask_sequence(sequence,input_length, 
@@ -304,7 +310,7 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
     # get peaks centers 
     peaks_center = tf.ensure_shape(tf.io.parse_tensor(data['peaks_center'], out_type=tf.int32), [output_length])
     peaks_center = tf.expand_dims(peaks_center,axis=1)
-    peaks_c_crop = tf.slice(peaks_center, [crop_size,0], [output_length-2*crop_size,-1]) # crop at the outset 
+    peaks_c_crop = tf.slice(peaks_center, [crop_size,0], [output_length-2*crop_size,-1]) # crop at the outset
 
     peaks_sum = tf.reduce_sum(peaks_center)
 
@@ -317,7 +323,6 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
     shift = tf.random.stateless_uniform(
         shape=(), minval=0, maxval=max_shift, 
         seed=[randomish_seed+1,randomish_seed+2], dtype=tf.int32)
-
 
     # sequence, get substring based on sequence shift, one_hot
     sequence = one_hot(tf.strings.substr(data['sequence'], shift,input_length))
@@ -348,7 +353,7 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
                                                 1, # set atac_mask_int to 1 to prevent increased masking used in training
                                                 atac_mask_dropout)
 
-    masked_atac = atac * full_comb_mask ## apply the mask to the input profile 
+    masked_atac = atac * full_comb_mask ## apply the mask to the input profile
 
     if log_atac:
         masked_atac = tf.math.log1p(masked_atac)
@@ -370,16 +375,22 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
     atac_out = tf.reduce_sum(tf.reshape(atac_target, [-1,tiling_req]),axis=1,keepdims=True)
     diff = tf.math.sqrt(tf.nn.relu(atac_out - 2000.0 * tf.ones(atac_out.shape))) # soft clip the targets
     atac_out = tf.clip_by_value(atac_out, clip_value_min=0.0, clip_value_max=2000.0) + diff
-    atac_out = tf.slice(atac_out, [crop_size,0], [output_length-2*crop_size,-1]) # crop to desired length 
+    atac_out = tf.slice(atac_out, [crop_size,0], [output_length-2*crop_size,-1]) # crop to desired length
 
     # in case we want to run ablation without these inputs
     if not use_atac:
         print('not using atac')
-        masked_atac = tf.zeros_like(masked_atac)
+        masked_atac = tf.random.stateless_uniform(shape=[output_length_ATAC], minval=0, maxval=150, 
+                                                      seed=[randomish_seed+1,randomish_seed+3],
+                                                      dtype=tf.float32)
 
     if not use_seq:
         print('not using sequence')
-        sequence = tf.zeros_like(sequence)
+        random_sequence = tf.random.stateless_uniform(shape=[input_length], minval=0, maxval=4, 
+                                                      seed=[randomish_seed+21,randomish_seed+2],
+                                                      dtype=tf.int32)
+        random_one_hot = tf.one_hot(random_sequence, depth=4)
+        sequence = random_one_hot
 
     return tf.cast(tf.ensure_shape(sequence, 
                                    [input_length,4]),dtype=tf.bfloat16), \

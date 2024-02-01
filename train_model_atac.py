@@ -287,7 +287,7 @@ def main():
                 optimizer.lr.assign(lr)
                 optimizer.learning_rate.assign(lr)
                 strategy.run(train_step, args=(next(train_human_its_mult[epoch_i]),))
-                current_optimizer_step += k
+                current_optimizer_step += 1
 
             optimizer_step_track.assign(current_optimizer_step)
             print('lr at:' + str(optimizer.lr.values[0]))

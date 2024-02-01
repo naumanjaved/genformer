@@ -26,9 +26,6 @@ python3 train_model_atac.py \
             --min_delta=0.0000005 \
             --model_save_dir="gs://genformer_europe_west_copy/atac_pretrain/models" \
             --model_save_basename="genformer" \
-            --lr_base="1.0e-04" \
-            --decay_frac="0.10" \
-            --gradient_clip="1.0" \
             --epsilon=1.0e-8 \
             --num_transformer_layers="3" \
             --dropout_rate="0.20" \
@@ -45,9 +42,7 @@ python3 train_model_atac.py \
             --atac_mask_dropout_val=0.10 \
             --log_atac="False" \
             --random_mask_size="1536" \
-            --use_atac="True" \
             --final_point_scale="4" \
-            --use_seq="True" \
             --val_data_seed=25 \
             --atac_corrupt_rate="25" \
             --use_motif_activity="True" \
@@ -56,3 +51,10 @@ python3 train_model_atac.py \
             --best_val_loss=100.0 \
             --loss_type="poisson" \
             --seed=25 \
+            --lr_base="1.0e-04" \
+            --decay_frac="0.10" \
+            --warmup_frac=1.0 \
+            --gradient_clip="1.0" \
+            --decay_steps=12000
+            --use_atac="True" \
+            --use_seq="True"
