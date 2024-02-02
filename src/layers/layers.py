@@ -18,15 +18,19 @@ from tensorflow.keras.layers.experimental import SyncBatchNormalization as syncb
 class SoftmaxPooling1D(kl.Layer):
     """Softmax pooling layer."""
     def __init__(self,
-                 pool_size=2, w_init_scale=2.0, name='softmax_pooling', **kwargs):
+                 pool_size=2,
+                 w_init_scale=2.0,
+                 kernel_init=None,
+                 name='softmax_pooling', **kwargs):
         super().__init__(name=name, **kwargs)
         self.pool_size = pool_size
         self.w_init_scale = w_init_scale
+        self.kernel_init=kernel_init
 
         self.dense = kl.Dense(
             units = 1,
             use_bias=False,
-            kernel_initializer=tf.keras.initializers.Identity(gain=self.w_init_scale))
+            kernel_initializer=tf.keras.initializers.Identity(gain=self.w_init_scale) if self.kernel_init is not None else self.kernel_init)
 
     def call(self, inputs, **kwargs):
         _, length, num_features = inputs.shape
@@ -490,7 +494,7 @@ class Performer_Encoder(kl.Layer):
 
         if self.norm:
             x = self.layer_norm(x)
-        x = tf.cast(x, dtype=tf.bfloat16)
+        #x = tf.cast(x, dtype=tf.bfloat16)
         return x,att_matrices
 
 
@@ -510,7 +514,8 @@ class FixedPositionalEmbedding(tf.keras.layers.Layer):
                               tf.math.cos(self.sinusoid_inp)), axis=-1)
 
     def call(self, x):
-        return self.emb[None, :x.shape[1], :]
+        return tf.cast(self.emb[None, :x.shape[1], :],
+                       dtype=tf.bfloat16)
 
 @tf.keras.utils.register_keras_serializable()
 class TargetLengthCrop1D(kl.Layer):
