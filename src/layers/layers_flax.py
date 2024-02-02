@@ -203,14 +203,14 @@ class FFN(kl.Layer):
         return cls(**config)
 
     def call(self, inputs, training=None):
-        #x = tf.cast(inputs,dtype=tf.float32)
-        x = self.FFN_layer_norm(inputs)
+        x = tf.cast(inputs,dtype=tf.float32)
+        x = self.FFN_layer_norm(x)
         x = self.FFN_dense_wide(x)
         x = self.dropout(x,training=training)
         x = self.relu(x)
         x = self.FFN_dense_narrow(x)
         x = self.dropout(x,training=training)
-        #x = tf.cast(x,dtype=tf.float32)
+        x = tf.cast(x,dtype=tf.float32)
         return x
 
 @tf.keras.utils.register_keras_serializable()
@@ -348,7 +348,7 @@ class Performer(kl.Layer):
 
         x = self.dropout(x, training=training) ## 0.40
 
-        mha_output = x + inputs
+        mha_output = tf.cast(x + inputs,dtype=tf.float32)
         ## ffn
         FFN_out = self.FFN(mha_output,training=training,**kwargs)
         #return self.layer_norm(FFN_out + mha_output), k_prime, q_prime
@@ -409,16 +409,16 @@ class Performer_Encoder(kl.Layer):
         self.load_init=load_init
         self.inits=inits
 
-        self.layers = [Performer(d_model=self.d_model, #
-                                 normalize=self.normalize, #
-                                 hidden_size=self.hidden_size, #
-                                 num_heads=self.num_heads, # 8
-                                 dropout_rate=self.dropout_rate, #
+        self.layers = [Performer(d_model=self.d_model, # 
+                                 normalize=self.normalize, # 
+                                 hidden_size=self.hidden_size, # 
+                                 num_heads=self.num_heads, # 8 
+                                 dropout_rate=self.dropout_rate, # 
                                  numerical_stabilizer=self.numerical_stabilizer, # 1.0e-03
-                                 nb_random_features=self.nb_random_features, # ignore
-                                 max_seq_length=self.max_seq_length, # 8192
-                                 kernel_transformation=self.kernel_transformation, # relu
-                                 seed=self.seed, # use whatever
+                                 nb_random_features=self.nb_random_features, # ignore 
+                                 max_seq_length=self.max_seq_length, # 8192 
+                                 kernel_transformation=self.kernel_transformation, # relu 
+                                 seed=self.seed, # use whatever 
                                  use_rot_emb=self.use_rot_emb, # True
                                  load_init=self.load_init,
                                  LN_gamma_init = inits["LN_g" + str(i)] if self.load_init else None,
@@ -479,7 +479,7 @@ class Performer_Encoder(kl.Layer):
 
     def call(self, x, training=None, **kwargs):
         att_matrices={}
-        #x = tf.cast(x, dtype=tf.float32)
+        x = tf.cast(x, dtype=tf.float32)
         for idx,layer in enumerate(self.layers):
             x += self.pos_emb(x) # c/w with lucid rains implementation
             rpe = self.layer_pos_emb(x) ### check whether fixedpositionalembedding is c/w 
@@ -510,7 +510,8 @@ class FixedPositionalEmbedding(tf.keras.layers.Layer):
                               tf.math.cos(self.sinusoid_inp)), axis=-1)
 
     def call(self, x):
-        return self.emb[None, :x.shape[1], :]
+        return tf.cast(self.emb[None, :x.shape[1], :],
+                       dtype=tf.float32)
 
 @tf.keras.utils.register_keras_serializable()
 class TargetLengthCrop1D(kl.Layer):

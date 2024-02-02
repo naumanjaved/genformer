@@ -95,7 +95,7 @@ def return_train_val_functions(model, optimizer,
         metric_dict['ATAC_PearsonR'].update_state(target_atac, output_atac)
         metric_dict['ATAC_R2'].update_state(target_atac, output_atac)
 
-    @tf.function
+    
     def build_step(iterator): # just to build the model
         @tf.function(reduce_retracing=True)
         def val_step(inputs):
@@ -243,12 +243,6 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
                                                       dtype=tf.int32)
         random_one_hot = tf.one_hot(random_sequence, depth=4)
         sequence = random_one_hot
-
-    #print('low level sequence masking')
-    #sequence = mask_sequence(sequence,input_length, 
-    #                            bin_size=(output_res // 4), # mask 4 random bases per 128 bp
-    #                            kmer_size=1,
-    #                            seed=randomish_seed+12)
 
     return tf.cast(tf.ensure_shape(sequence, 
                                    [input_length,4]),dtype=tf.bfloat16), \

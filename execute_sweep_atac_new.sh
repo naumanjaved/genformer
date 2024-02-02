@@ -34,7 +34,7 @@ python3 train_model_atac.py \
             --kernel_transformation="relu_kernel_transformation" \
             --savefreq=1 \
             --rectify="True" \
-            --filter_list_seq="384,512,640,768,896,1024" \
+            --filter_list_seq="512,512,768,768,1024,1024" \
             --filter_list_atac="32,64" \
             --atac_mask_dropout=0.15 \
             --atac_mask_dropout_val=0.15 \
@@ -49,11 +49,11 @@ python3 train_model_atac.py \
             --use_rot_emb="True" \
             --best_val_loss=100.0 \
             --lr_base="5.0e-04" \
-            --decay_frac="0.10" \
+            --decay_frac="0.02" \
             --gradient_clip="5.0" \
             --seed=1 \
             --val_data_seed=1 \
             --loss_type="poisson" \
             --model_save_basename="genformer" \
-            --warmup_frac=2.0 \
-            --decay_steps=100000
+            --warmup_frac=3.0 \
+            --decay_steps=50000
