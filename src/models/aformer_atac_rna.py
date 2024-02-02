@@ -120,7 +120,8 @@ class genformer(tf.keras.Model):
                                                 b_init=self.inits['stem_res_conv_b'] if self.load_init else None,
                                                 BN_momentum=self.BN_momentum,
                                                 name='pointwise_conv_block'))
-        self.stem_pool = tf.keras.layers.MaxPool1D(pool_size=2)
+        self.stem_pool = SoftmaxPooling1D(name='stem_pool',
+                                          kernel_init=self.inits['stem_pool_k'] if self.load_init else None)
 
         # convolutional stem for ATAC profile
         self.stem_conv_atac = tf.keras.layers.Conv1D(
@@ -140,7 +141,7 @@ class genformer(tf.keras.Model):
                                                     b_init=self.inits['stem_res_conv_atac_b'] if self.load_init else None,
                                                     BN_momentum=self.BN_momentum,
                                                     name='pointwise_conv_block_atac'))
-        self.stem_pool_atac = tf.keras.layers.MaxPool1D(pool_size=2)
+        self.stem_pool_atac = tf.keras.layers.MaxPooling1D(pool_size=2)
 
         # convolutional tower for sequence input
         self.conv_tower = tf.keras.Sequential([
@@ -156,7 +157,8 @@ class genformer(tf.keras.Model):
                                k_init=self.inits['conv1_k_' + str(i)] if self.load_init else None,
                                b_init=self.inits['conv1_b_' + str(i)] if self.load_init else None,
                                padding='same'),
-                tf.keras.layers.MaxPool1D(pool_size=2)],
+                SoftmaxPooling1D(kernel_init=self.inits['soft_max_pool_k_' + str(i)] if self.load_init else None,
+                                 name=f'soft_max_pool_{i}')],
                        name=f'conv_tower_block_{i}')
             for i, num_filters in enumerate(self.filter_list_seq)], name='conv_tower')
 
@@ -175,7 +177,7 @@ class genformer(tf.keras.Model):
                                k_init=self.inits['conv_at1_k_' + str(i)] if self.load_init else None,
                                b_init=self.inits['conv_at1_b_' + str(i)] if self.load_init else None,
                                padding='same'),
-                tf.keras.layers.MaxPool1D(pool_size=4)],
+                tf.keras.layers.MaxPooling1D(pool_size=4)],
                        name=f'conv_tower_block_atac_{i}')
             for i, num_filters in enumerate(self.filter_list_atac)], name='conv_tower_atac')
 
@@ -239,11 +241,6 @@ class genformer(tf.keras.Model):
                                             bias_initializer=self.inits['final_dense_b'] if self.load_init else 'zeros',
                                             use_bias=True)
 
-        self.final_pointwise_conv_rna = conv_block(filters=self.filter_list_seq[-1] // self.final_point_scale,
-                                                BN_momentum=self.BN_momentum,
-                                                  **kwargs,
-                                                  name = 'final_pointwise')
-
         self.final_dense_profile_rna = kl.Dense(1,
                                             activation='softplus',
                                             kernel_initializer='lecun_normal',
@@ -261,10 +258,10 @@ class genformer(tf.keras.Model):
         sequence,atac,motif_activity = inputs
 
         # sequence input processing
-        x = self.stem_conv(sequence, training=training)
-        x = self.stem_res_conv(x, training=training)
-        x = self.stem_pool(x, training=training)
-        x = self.conv_tower(x, training=training)
+        sequence = self.stem_conv(sequence, training=training)
+        sequence = self.stem_res_conv(sequence, training=training)
+        sequence = self.stem_pool(sequence, training=training)
+        sequence = self.conv_tower(sequence, training=training)
 
         # atac input processsing
         atac_x = self.stem_conv_atac(atac, training=training)
@@ -278,23 +275,19 @@ class genformer(tf.keras.Model):
         motif_activity = self.motif_activity_fc2(motif_activity)
         motif_activity = tf.tile(motif_activity, [1, self.output_length, 1])
 
-        transformer_input = tf.concat([x,atac_x, motif_activity], axis=2) # append processed seq,atac,motif inputs in channel dim.
+        transformer_input = tf.concat([sequence,atac_x, motif_activity], 
+                                      axis=2) # append processed seq,atac,motif inputs in channel dim.
         out_performer,att_matrices = self.performer(transformer_input, training=training)
-        out = self.crop_final(out_performer)
+        
+        out = self.final_pointwise_conv(out_performer, training=training) ## 
+        out = self.dropout(out, training=training) ## 0.05 default in tom's implementation
+        out = self.gelu(out)
+        out_atac = self.final_dense_profile(out, training=training)
+        out_rna = self.final_dense_profile_rna(out, training=training)
 
-        out_atac = self.final_pointwise_conv(out, training=training)
-        out_atac = self.dropout(out_atac, training=training)
-        out_atac = self.gelu(out_atac)
-        out_profile_atac = self.final_dense_profile(out_atac, training=training)
-
-        ## add layers for RNA prediction
-        out_rna = self.final_pointwise_conv_rna(out, training=training)
-        out_rna = self.dropout(out_rna, training=training)
-        out_rna = self.gelu(out_rna)
-        out_profile_rna = self.final_dense_profile_rna(out_rna, training=training)
-
+        out_profile_atac = self.crop_final(out_atac) ## tom crops only on loss, tom will try cropping less 
+        out_profile_rna = self.crop_final(out_rna) ## tom crops only on loss, tom will try cropping less 
         return out_profile_atac,out_profile_rna
-
 
     def get_config(self):
         config = {
