@@ -63,7 +63,7 @@ def return_train_val_functions(model, optimizer,
             output_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_profile, mask_indices), axis=0), axis=2)
 
             # Calculate and scale loss, since it will be summed across all replicas at each step
-            loss = tf.reduce_mean(loss_fn(target_atac, output_atac)) * (1.0/num_replicas)
+            loss = tf.reduce_mean(loss_fn(target_atac, output_atac)) * (1.0/num_replicas*4.0)
 
         gradients = tape.gradient(loss, model.trainable_variables)
         optimizer.apply_gradients(zip(gradients,  model.trainable_variables))
@@ -89,7 +89,7 @@ def return_train_val_functions(model, optimizer,
         output_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_profile, mask_indices), axis=0), axis=2)
 
         # Calculate and scale loss, since it will be summed across all replicas at each step
-        loss = tf.reduce_mean(loss_fn(target_atac, output_atac)) * (1.0/num_replicas)
+        loss = tf.reduce_mean(loss_fn(target_atac, output_atac)) * (1.0/(num_replicas*4.0))
 
         metric_dict["val_loss"].update_state(loss)
         metric_dict['ATAC_PearsonR'].update_state(target_atac, output_atac)
@@ -152,18 +152,10 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
     ## here we need to set up some random numbers to achieve data augmentation
     atac_mask_int = g.uniform([], 0, atac_corrupt_rate, dtype=tf.int32) # random increase ATAC masking w/ 1/atac_corrupt_rate prob. 
     randomish_seed = g.uniform([], 0, 100000000,dtype=tf.int32) # work-around to ensure random-ish stateless operations
-    shift = tf.random.stateless_uniform(shape=(),
-                      minval=0,
-                      maxval=max_shift,
-                      seed=[randomish_seed+1,randomish_seed+2],
-                      dtype=tf.int32)
+    shift = g.uniform(shape=(), minval=0, maxval=max_shift, dtype=tf.int32)
     
-    rev_comp = tf.random.stateless_uniform(shape=[],
-                                            minval=0,
-                                            maxval=2,
-                                            seed=[randomish_seed+5,randomish_seed+6], 
-                                            dtype=tf.int32)
-
+    rev_comp = tf.math.round(g.uniform([], 0, 1)) #switch for random reverse complementation
+    
     # parse out the actual data 
     data = tf.io.parse_example(serialized_example, feature_map)
 
@@ -173,6 +165,8 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
     # atac input, cast to float32 
     atac = tf.cast(tf.ensure_shape(tf.io.parse_tensor(data['atac'], out_type=tf.float16), 
                                    [output_length_ATAC,1]),dtype=tf.float32)
+    atac = atac + tf.math.abs(g.normal(atac.shape,mean=1.0e-03,stddev=1.0e-03,dtype=tf.float32))
+
     atac_target = atac ## store the target ATAC, as we will subsequently directly manipulate atac for masking
     # get peaks centers 
     peaks_center = tf.expand_dims(tf.io.parse_tensor(data['peaks_center'], out_type=tf.int32), 
@@ -228,7 +222,7 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
     diff = tf.math.sqrt(tf.nn.relu(atac_out - 2000.0 * tf.ones(atac_out.shape))) # soft clip the targets
     atac_out = tf.clip_by_value(atac_out, clip_value_min=0.0, clip_value_max=2000.0) + diff
     atac_out = tf.slice(atac_out, [crop_size,0], [output_length-2*crop_size,-1]) # crop to desired length
-
+    
     # in case we want to run ablation without these inputs
     if not use_atac:
         print('not using atac')
@@ -297,6 +291,7 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
     # atac input, cast to float32 
     atac = tf.ensure_shape(tf.io.parse_tensor(data['atac'], out_type=tf.float16), [output_length_ATAC,1])
     atac = tf.cast(atac,dtype=tf.float32)
+    atac = atac + tf.math.abs(g.normal(atac.shape,mean=1.0e-03,stddev=1.0e-03,dtype=tf.float32))
     atac_target = atac ## store the target ATAC, as we will subsequently directly manipulate atac for masking
 
     # set up a semi-random seem based on the number of
@@ -310,14 +305,12 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
 
     randomish_seed = peaks_sum + tf.cast(tf.reduce_sum(atac),dtype=tf.int32)
 
-    rev_comp = tf.random.stateless_uniform(
-        shape=[], minval=0, maxval=2, 
-        seed=[randomish_seed+5,randomish_seed+6], dtype=tf.int32)
-
-    shift = tf.random.stateless_uniform(
-        shape=(), minval=0, maxval=max_shift, 
-        seed=[randomish_seed+1,randomish_seed+2], dtype=tf.int32)
-
+    rev_comp = tf.math.round(g_val.uniform([], 0, 1)) #switch for random reverse complementation
+    
+    shift = g_val.uniform(shape=(), minval=0, maxval=max_shift, dtype=tf.int32)
+    
+    rev_comp = tf.math.round(g_val.uniform([], 0, 1)) #switch for random reverse complementation
+    
     # sequence, get substring based on sequence shift, one_hot
     sequence = one_hot(tf.strings.substr(data['sequence'], shift,input_length))
 
@@ -741,6 +734,107 @@ def mask_ATAC_profile(output_length_ATAC, output_length, crop_size, mask_size,ou
     out_length_cropped = output_length-2*crop_size
     if out_length_cropped % num_mask_bins != 0:
         raise ValueError('ensure that masking size divided by output res is a factor of the cropped output length')
+    
+
+    center = (output_length-2*crop_size)//2 # compute center of the output window
+
+    mask_indices_temp = tf.where(peaks_c_crop[:,0] > 0)[:,0]
+    ridx = tf.concat([tf.random.experimental.stateless_shuffle(mask_indices_temp,seed=[4+randomish_seed,5]),
+                      tf.constant([center],dtype=tf.int64)],axis=0)   ### concatenate the middle in case theres no peaks
+    mask_indices = [[ridx[0]+x+crop_size] for x in range(-num_mask_bins//2,1+(num_mask_bins//2))]
+
+    st=tf.SparseTensor(
+        indices=mask_indices,
+        values=[1.0]*len(mask_indices),
+        dense_shape=[output_length])
+    dense_peak_mask=tf.sparse.to_dense(st)
+    dense_peak_mask_store = dense_peak_mask
+    dense_peak_mask=1.0-dense_peak_mask ### masking regions here are set to 1. so invert the mask to actually use
+    dense_peak_mask = tf.expand_dims(dense_peak_mask,axis=1)
+
+    out_length_cropped = output_length-2*crop_size
+    if out_length_cropped % num_mask_bins != 0:
+        raise ValueError('ensure that masking region size divided by output res is a factor of the cropped output length')
+    edge_append = tf.ones((crop_size,1),dtype=tf.float32) ## since we only mask over the center 896, base calcs on the cropped size
+    atac_mask = tf.ones(out_length_cropped // num_mask_bins,dtype=tf.float32)
+
+    '''now compute the random atac seq dropout, which is done in addition to the randomly selected peak '''
+    if ((atac_mask_int == 0)):
+        atac_mask_dropout = 3 * atac_mask_dropout
+    atac_mask=tf.nn.experimental.stateless_dropout(atac_mask,
+                                              rate=(atac_mask_dropout),
+                                              seed=[0,randomish_seed-5]) / (1. / (1.0-(atac_mask_dropout)))
+    atac_mask = tf.expand_dims(atac_mask,axis=1)
+    atac_mask = tf.tile(atac_mask, [1,num_mask_bins])
+    atac_mask = tf.reshape(atac_mask, [-1])
+    atac_mask = tf.expand_dims(atac_mask,axis=1)
+    atac_mask_store = 1.0 - atac_mask ### store the actual masked regions after inverting the mask
+
+    full_atac_mask = tf.concat([edge_append,atac_mask,edge_append],axis=0)
+    full_comb_mask = tf.math.floor((dense_peak_mask + full_atac_mask)/2)
+    full_comb_mask_store = 1.0 - full_comb_mask
+
+    full_comb_mask_full_store = full_comb_mask_store
+    full_comb_mask_store = full_comb_mask_store[crop_size:-crop_size,:] # store the cropped mask
+    tiling_req = output_length_ATAC // output_length ### how much do we need to tile the atac signal to desired length
+    full_comb_mask = tf.expand_dims(tf.reshape(tf.tile(full_comb_mask, [1,tiling_req]),[-1]),axis=1)
+
+    return full_comb_mask, full_comb_mask_store
+
+
+def mask_sequence(sequence, sequence_length, bin_size=32, kmer_size=1, seed=4):
+    num_stretches = sequence_length // bin_size
+
+    start_indices = tf.random.stateless_uniform(shape=[num_stretches], 
+                                                minval=0,
+                                                maxval=bin_size - kmer_size + 1,
+                                                seed=[seed+11, seed+2],
+                                                dtype=tf.int32) + \
+                    tf.range(0, sequence_length, bin_size)
+    # Use broadcasting to add range_tensor to each element in start_indices
+    all_indices_tensor = start_indices[:, tf.newaxis] + tf.range(kmer_size)
+    all_indices_tensor = tf.expand_dims(tf.reshape(all_indices_tensor,[-1]),
+                                        axis=1)
+
+    mask = tf.ones(sequence_length)
+    updates = tf.squeeze(tf.zeros_like(all_indices_tensor,dtype=tf.float32))
+    mask = tf.tensor_scatter_nd_update(mask, all_indices_tensor, updates)
+
+    sequence_masked = sequence * tf.expand_dims(mask,axis=1)
+    return sequence_masked
+
+
+
+
+
+'''
+simplify
+
+def mask_ATAC_profile(output_length_ATAC, output_length, crop_size, mask_size,output_res, 
+                        peaks_c_crop, randomish_seed, atac_mask_int, atac_mask_dropout):
+    """
+    Creates a random mask for the input ATAC profile
+    The mask consists of 1s and 0s, where 1s indicate masked regions.
+    Mask is generated by selecting one peak to mask in the window if present,
+    and randomly masking atac_mask_dropout % of the remaining bins
+
+    Parameters:
+    - output_length_ATAC: the length of the input ATAC profile (at 4 bp resolution)
+    - output_length: The length of the output ATAC profile
+    - crop_size: The size of the cropped region to take from each edge of output ATAC profile
+    - mask_size: The size of the masked region in basepairs
+    - output_res: The resolution of the output target ATAC profile
+    - peaks_c_crop: The center of the peaks in the output ATAC profile
+    - randomish_seed: A random seed to use for the random masking
+    - atac_mask_dropout: The dropout rate for the ATAC masking
+    Returns:
+    - The mask as well as inverted mask. Inverted mask is used to set the masked regions to 0. 
+    """
+
+    num_mask_bins = mask_size // output_res ## calculate the number of bins that will be masked in each region
+    out_length_cropped = output_length-2*crop_size
+    if out_length_cropped % num_mask_bins != 0:
+        raise ValueError('ensure that masking size divided by output res is a factor of the cropped output length')
     center = (output_length-2*crop_size)//2 # compute center of the output window
 
     
@@ -787,7 +881,6 @@ def mask_ATAC_profile(output_length_ATAC, output_length, crop_size, mask_size,ou
     atac_mask = tf.expand_dims(atac_mask,axis=1)
     full_atac_mask = tf.concat([edge_append,atac_mask,edge_append],axis=0)
 
-
     # -----------------------here we COMBINE atac and peak mask -------------------------------------------------
     full_comb_mask = tf.math.floor((dense_peak_mask + full_atac_mask)/2) # if either mask is 0, mask value set to 0
     full_comb_mask_store = 1.0 - full_comb_mask # store the mask after inverting it to get the masked region indices
@@ -799,27 +892,4 @@ def mask_ATAC_profile(output_length_ATAC, output_length, crop_size, mask_size,ou
         full_comb_mask_store = full_comb_mask_store[crop_size:-crop_size,:] # store the cropped mask
 
     return full_comb_mask, full_comb_mask_store
-
-
-def mask_sequence(sequence, sequence_length, bin_size=32, kmer_size=1, seed=4):
-    num_stretches = sequence_length // bin_size
-
-    start_indices = tf.random.stateless_uniform(shape=[num_stretches], 
-                                                minval=0,
-                                                maxval=bin_size - kmer_size + 1,
-                                                seed=[seed+11, seed+2],
-                                                dtype=tf.int32) + \
-                    tf.range(0, sequence_length, bin_size)
-    # Use broadcasting to add range_tensor to each element in start_indices
-    all_indices_tensor = start_indices[:, tf.newaxis] + tf.range(kmer_size)
-    all_indices_tensor = tf.expand_dims(tf.reshape(all_indices_tensor,[-1]),
-                                        axis=1)
-
-    mask = tf.ones(sequence_length)
-    updates = tf.squeeze(tf.zeros_like(all_indices_tensor,dtype=tf.float32))
-    mask = tf.tensor_scatter_nd_update(mask, all_indices_tensor, updates)
-
-    sequence_masked = sequence * tf.expand_dims(mask,axis=1)
-    return sequence_masked
-
-
+'''

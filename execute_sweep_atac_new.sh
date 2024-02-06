@@ -49,11 +49,11 @@ python3 train_model_atac.py \
             --use_rot_emb="True" \
             --best_val_loss=100.0 \
             --lr_base="5.0e-04" \
-            --decay_frac="0.02" \
+            --decay_frac="0.10" \
             --gradient_clip="5.0" \
             --seed=1 \
             --val_data_seed=1 \
-            --loss_type="poisson" \
+            --loss_type="poisson_multinomial" \
             --model_save_basename="genformer" \
             --warmup_frac=3.0 \
             --decay_steps=50000
