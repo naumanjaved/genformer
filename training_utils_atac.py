@@ -63,7 +63,7 @@ def return_train_val_functions(model, optimizer,
             output_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_profile, mask_indices), axis=0), axis=2)
 
             # Calculate and scale loss, since it will be summed across all replicas at each step
-            loss = tf.reduce_mean(loss_fn(target_atac, output_atac)) * (1.0/num_replicas*4.0)
+            loss = tf.reduce_mean(loss_fn(target_atac, output_atac)) * (1.0/num_replicas)
 
         gradients = tape.gradient(loss, model.trainable_variables)
         optimizer.apply_gradients(zip(gradients,  model.trainable_variables))
@@ -165,7 +165,7 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
     # atac input, cast to float32 
     atac = tf.cast(tf.ensure_shape(tf.io.parse_tensor(data['atac'], out_type=tf.float16), 
                                    [output_length_ATAC,1]),dtype=tf.float32)
-    atac = atac + tf.math.abs(g.normal(atac.shape,mean=1.0e-03,stddev=1.0e-03,dtype=tf.float32))
+    atac = atac + tf.math.abs(g.normal(atac.shape,mean=1.0e-04,stddev=1.0e-04,dtype=tf.float32))
 
     atac_target = atac ## store the target ATAC, as we will subsequently directly manipulate atac for masking
     # get peaks centers 
@@ -291,7 +291,8 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
     # atac input, cast to float32 
     atac = tf.ensure_shape(tf.io.parse_tensor(data['atac'], out_type=tf.float16), [output_length_ATAC,1])
     atac = tf.cast(atac,dtype=tf.float32)
-    atac = atac + tf.math.abs(g.normal(atac.shape,mean=1.0e-03,stddev=1.0e-03,dtype=tf.float32))
+    atac = atac + tf.math.abs(g.normal(atac.shape,mean=1.0e-04,stddev=1.0e-04,dtype=tf.float32))
+
     atac_target = atac ## store the target ATAC, as we will subsequently directly manipulate atac for masking
 
     # set up a semi-random seem based on the number of
