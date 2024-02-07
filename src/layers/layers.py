@@ -14,23 +14,21 @@ import src.utils as utils
 from tensorflow.keras import regularizers
 from tensorflow.keras.layers.experimental import SyncBatchNormalization as syncbatchnorm
 
+def custom_constant_initializer(shape, dtype=None):
+    return tf.constant(2.0, shape=shape, dtype=dtype)
+
 @tf.keras.utils.register_keras_serializable()
 class SoftmaxPooling1D(kl.Layer):
     """Softmax pooling layer."""
     def __init__(self,
-                 pool_size=2,
-                 w_init_scale=2.0,
-                 kernel_init=None,
-                 name='softmax_pooling', **kwargs):
+                 pool_size=2, w_init_scale=2.0, name='softmax_pooling', **kwargs):
         super().__init__(name=name, **kwargs)
         self.pool_size = pool_size
         self.w_init_scale = w_init_scale
-        self.kernel_init=kernel_init
-
         self.dense = kl.Dense(
             units = 1,
             use_bias=False,
-            kernel_initializer=tf.keras.initializers.Identity(gain=self.w_init_scale) if self.kernel_init is not None else self.kernel_init)
+            kernel_initializer=custom_constant_initializer)
 
     def call(self, inputs, **kwargs):
         _, length, num_features = inputs.shape
@@ -497,8 +495,6 @@ class Performer_Encoder(kl.Layer):
         #x = tf.cast(x, dtype=tf.bfloat16)
         return x,att_matrices
 
-
-
 @tf.keras.utils.register_keras_serializable()
 class FixedPositionalEmbedding(tf.keras.layers.Layer):
     def __init__(self, dim, max_seq_len):
@@ -512,7 +508,6 @@ class FixedPositionalEmbedding(tf.keras.layers.Layer):
         self.sinusoid_inp = tf.einsum("i,j->ij", self.position, self.inv_freq)
         self.emb = tf.concat((tf.math.sin(self.sinusoid_inp),
                               tf.math.cos(self.sinusoid_inp)), axis=-1)
-
     def call(self, x):
         return tf.cast(self.emb[None, :x.shape[1], :],
                        dtype=tf.bfloat16)
