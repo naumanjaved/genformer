@@ -32,10 +32,16 @@ def return_train_val_functions(model, optimizer,
     metric_dict["train_loss"] = tf.keras.metrics.Mean("train_loss", dtype=tf.float32)
     metric_dict["val_loss"] = tf.keras.metrics.Mean("val_loss",  dtype=tf.float32)
 
+    metric_dict["train_loss_um"] = tf.keras.metrics.Mean("train_loss_um", dtype=tf.float32)
+    metric_dict["val_loss_um"] = tf.keras.metrics.Mean("val_loss_um",  dtype=tf.float32)
+
     metric_dict['ATAC_PearsonR_tr'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
     metric_dict['ATAC_R2_tr'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
     metric_dict['ATAC_PearsonR'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
     metric_dict['ATAC_R2'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
+
+    metric_dict['ATAC_PearsonR_um'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
+    metric_dict['ATAC_R2_um'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
 
     if loss_type == 'poisson_multinomial':
         def loss_fn(y_true,y_pred, total_weight=total_weight, epsilon=1e-6, rescale=True):
@@ -79,6 +85,7 @@ def return_train_val_functions(model, optimizer,
 
         # update metrics for train step, compute pearsons just over the masked regions
         metric_dict["train_loss"].update_state(loss)
+        metric_dict["train_loss_um"].update_state(loss_unmasked)
         metric_dict['ATAC_PearsonR_tr'].update_state(target_atac, output_atac)
         metric_dict['ATAC_R2_tr'].update_state(target_atac, output_atac)
 
@@ -104,8 +111,11 @@ def return_train_val_functions(model, optimizer,
         loss = loss_masked + loss_unmasked
 
         metric_dict["val_loss"].update_state(loss)
+        metric_dict["val_loss_um"].update_state(loss_unmasked)
         metric_dict['ATAC_PearsonR'].update_state(target_atac, output_atac)
         metric_dict['ATAC_R2'].update_state(target_atac, output_atac)
+        metric_dict['ATAC_PearsonR_um'].update_state(target_atac_um, output_atac_um)
+        metric_dict['ATAC_R2_um'].update_state(target_atac_um, output_atac_um)
 
     
     def build_step(iterator): # just to build the model
