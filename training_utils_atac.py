@@ -56,19 +56,28 @@ def return_train_val_functions(model, optimizer,
         with tf.GradientTape() as tape:
             output_profile = model(input_tuple, training=True)
             output_profile = tf.cast(output_profile,dtype=tf.float32)
-            
+
             mask_indices = tf.where(mask == 1) # extract indices of masked bins
             # subset target and predictions to masked bins
             target_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(target, mask_indices), axis=0), axis=2)
             output_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_profile, mask_indices), axis=0), axis=2)
 
-            # Calculate and scale loss, since it will be summed across all replicas at each step
-            loss = tf.reduce_mean(loss_fn(target_atac, output_atac)) * (1.0/num_replicas)
+            ## masked loss 
+            loss_masked = tf.reduce_mean(loss_fn(target_atac, output_atac)) * (1.0/num_replicas)
+
+            ## unmasked_loss
+            mask_indices_um = tf.where(mask == 0) # extract indices of unmasked bins
+            # subset target and predictions to masked bins
+            target_atac_um = tf.expand_dims(tf.expand_dims(tf.gather_nd(target, mask_indices_um), axis=0), axis=2)
+            output_atac_um = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_profile, mask_indices_um), axis=0), axis=2)
+            loss_unmasked = tf.reduce_mean(loss_fn(target_atac_um, output_atac_um)) * (1.0/num_replicas)
+            
+            loss = loss_masked + loss_unmasked
 
         gradients = tape.gradient(loss, model.trainable_variables)
         optimizer.apply_gradients(zip(gradients,  model.trainable_variables))
 
-        # update metrics for train step
+        # update metrics for train step, compute pearsons just over the masked regions
         metric_dict["train_loss"].update_state(loss)
         metric_dict['ATAC_PearsonR_tr'].update_state(target_atac, output_atac)
         metric_dict['ATAC_R2_tr'].update_state(target_atac, output_atac)
@@ -77,19 +86,22 @@ def return_train_val_functions(model, optimizer,
     def dist_val_step(inputs):  # main validation step 
         print('tracing validation step!')
         sequence,atac,mask,target,motif_activity =inputs
-
         input_tuple = sequence,atac,motif_activity
-
         output_profile = model(input_tuple, training=False)
         output_profile = tf.cast(output_profile,dtype=tf.float32)
 
         mask_indices = tf.where(mask == 1) # extract indices of masked bins
-        # subset target and predictions to masked bins
         target_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(target, mask_indices), axis=0), axis=2)
         output_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_profile, mask_indices), axis=0), axis=2)
+        loss_masked = tf.reduce_mean(loss_fn(target_atac, output_atac)) * (1.0/num_replicas)
 
-        # Calculate and scale loss, since it will be summed across all replicas at each step
-        loss = tf.reduce_mean(loss_fn(target_atac, output_atac)) * (1.0/(num_replicas*4.0))
+        ## unmasked_loss
+        mask_indices_um = tf.where(mask == 0) # extract indices of unasked bins
+        target_atac_um = tf.expand_dims(tf.expand_dims(tf.gather_nd(target, mask_indices_um), axis=0), axis=2)
+        output_atac_um = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_profile, mask_indices_um), axis=0), axis=2)
+        loss_unmasked = tf.reduce_mean(loss_fn(target_atac_um, output_atac_um)) * (1.0/num_replicas)
+        
+        loss = loss_masked + loss_unmasked
 
         metric_dict["val_loss"].update_state(loss)
         metric_dict['ATAC_PearsonR'].update_state(target_atac, output_atac)
@@ -735,33 +747,43 @@ def mask_ATAC_profile(output_length_ATAC, output_length, crop_size, mask_size,ou
     out_length_cropped = output_length-2*crop_size
     if out_length_cropped % num_mask_bins != 0:
         raise ValueError('ensure that masking size divided by output res is a factor of the cropped output length')
-    
-
     center = (output_length-2*crop_size)//2 # compute center of the output window
 
-    mask_indices_temp = tf.where(peaks_c_crop[:,0] > 0)[:,0]
-    ridx = tf.concat([tf.random.experimental.stateless_shuffle(mask_indices_temp,seed=[4+randomish_seed,5]),
-                      tf.constant([center],dtype=tf.int64)],axis=0)   ### concatenate the middle in case theres no peaks
-    mask_indices = [[ridx[0]+x+crop_size] for x in range(-num_mask_bins//2,1+(num_mask_bins//2))]
+    
+    # -------------------------- here we set up masking one of the peaks ----------------------------------------
+    mask_indices_temp = tf.where(peaks_c_crop[:,0] > 0)[:,0] # get indices of peak centers, randomly select one
+    mask_indices_temp = tf.random.experimental.stateless_shuffle(mask_indices_temp,seed=[4+randomish_seed,5])
 
-    st=tf.SparseTensor(
-        indices=mask_indices,
-        values=[1.0]*len(mask_indices),
-        dense_shape=[output_length])
-    dense_peak_mask=tf.sparse.to_dense(st)
-    dense_peak_mask_store = dense_peak_mask
-    dense_peak_mask=1.0-dense_peak_mask ### masking regions here are set to 1. so invert the mask to actually use
-    dense_peak_mask = tf.expand_dims(dense_peak_mask,axis=1)
+    if tf.size(mask_indices_temp) > 0: # in the case where we did actually have peaks in the window
+        ridx = tf.concat([mask_indices_temp],axis=0) # adjust dimensions by concatenating selected indices
+        start_index = ridx[0] - num_mask_bins // 2 + crop_size # compute start index of masked PEAK region
+        end_index = ridx[0] + 1 + num_mask_bins // 2 + crop_size # compute end index of masked PEAK region
+        indices = tf.range(start_index, end_index) # get range of indices
+        mask = (indices >= 0) & (indices < output_length) # mask to apply to indices to ensure they are valid
+        filtered_indices = tf.boolean_mask(indices, mask) # apply index mask
+        mask_indices = tf.cast(tf.reshape(filtered_indices, [-1, 1]), dtype=tf.int64) # now we get the full indices
+        st=tf.SparseTensor( # create sparse tensor with 1s at masked indices
+            indices=mask_indices,
+            values=tf.ones([tf.shape(mask_indices)[0]], dtype=tf.float32),
+            dense_shape=[output_length])
+        dense_peak_mask=tf.sparse.to_dense(st)
+        dense_peak_mask=1.0-dense_peak_mask # invert the mask to actually use
+    else:
+        dense_peak_mask = tf.ones([output_length],dtype=tf.float32) # if no peaks in window, no mask
+    dense_peak_mask = tf.expand_dims(dense_peak_mask,axis=1) # adjust dimenions to multiply by ATAC profile
 
-    out_length_cropped = output_length-2*crop_size
-    if out_length_cropped % num_mask_bins != 0:
-        raise ValueError('ensure that masking region size divided by output res is a factor of the cropped output length')
-    edge_append = tf.ones((crop_size,1),dtype=tf.float32) ## since we only mask over the center 896, base calcs on the cropped size
+    # -----------------------here we set up the RANDOM mask (not peak based) ------------------------------------
+    edge_append = tf.ones((crop_size,1),dtype=tf.float32) # we don't want the mask on the edge, so set these to 1
+
+    # we will create the mask by first initializing a tensor of 1s, with shape 
+    # based on the output cropped length and the number of bins to mask in each region. 
+    # e.g., if we want to mask 
     atac_mask = tf.ones(out_length_cropped // num_mask_bins,dtype=tf.float32)
 
-    '''now compute the random atac seq dropout, which is done in addition to the randomly selected peak '''
-    if ((atac_mask_int == 0)):
+    if ((atac_mask_int == 0)): # with 1/atac_mask_int probability, increase random masking percentage 
         atac_mask_dropout = 3 * atac_mask_dropout
+    
+    # here create the random mask using dropout 
     atac_mask=tf.nn.experimental.stateless_dropout(atac_mask,
                                               rate=(atac_mask_dropout),
                                               seed=[0,randomish_seed-5]) / (1. / (1.0-(atac_mask_dropout)))
@@ -769,16 +791,18 @@ def mask_ATAC_profile(output_length_ATAC, output_length, crop_size, mask_size,ou
     atac_mask = tf.tile(atac_mask, [1,num_mask_bins])
     atac_mask = tf.reshape(atac_mask, [-1])
     atac_mask = tf.expand_dims(atac_mask,axis=1)
-    atac_mask_store = 1.0 - atac_mask ### store the actual masked regions after inverting the mask
-
     full_atac_mask = tf.concat([edge_append,atac_mask,edge_append],axis=0)
-    full_comb_mask = tf.math.floor((dense_peak_mask + full_atac_mask)/2)
-    full_comb_mask_store = 1.0 - full_comb_mask
 
-    full_comb_mask_full_store = full_comb_mask_store
-    full_comb_mask_store = full_comb_mask_store[crop_size:-crop_size,:] # store the cropped mask
+
+    # -----------------------here we COMBINE atac and peak mask -------------------------------------------------
+    full_comb_mask = tf.math.floor((dense_peak_mask + full_atac_mask)/2) # if either mask is 0, mask value set to 0
+    full_comb_mask_store = 1.0 - full_comb_mask # store the mask after inverting it to get the masked region indices
+
     tiling_req = output_length_ATAC // output_length ### how much do we need to tile the atac signal to desired length
     full_comb_mask = tf.expand_dims(tf.reshape(tf.tile(full_comb_mask, [1,tiling_req]),[-1]),axis=1)
+
+    if crop_size > 0:
+        full_comb_mask_store = full_comb_mask_store[crop_size:-crop_size,:] # store the cropped mask
 
     return full_comb_mask, full_comb_mask_store
 
