@@ -264,9 +264,12 @@ def main():
             step_num = (wandb.config.num_epochs_to_start + epoch_idx) * \
                             wandb.config.train_steps * GLOBAL_BATCH_SIZE
             if (epoch_idx == 0):
-                if (wandb.config.reset_optimizer_state):
-                    print('restart optimizer learning rate schedule')
-                    current_optimizer_step = 0
+                if wandb.config.load_init:
+                    if not wandb.config.reset_optimizer_state:
+                        current_optimizer_step = optimizer_step_track.numpy()
+                    else:
+                        print('restart optimizer learning rate schedule')
+                        current_optimizer_step = 0
                 else:
                     current_optimizer_step = step_num//GLOBAL_BATCH_SIZE
 
@@ -316,6 +319,8 @@ def main():
             wandb.log({'val_loss': val_loss}, step=step_num)
             print('ATAC_pearsons: ' + str(metric_dict['ATAC_PearsonR'].result()['PearsonR'].numpy()))
             print('ATAC_R2: ' + str(metric_dict['ATAC_R2'].result()['R2'].numpy()))
+            print('ATAC_pearsons_um: ' + str(metric_dict['ATAC_PearsonR_um'].result()['PearsonR'].numpy()))
+            print('ATAC_R2_um: ' + str(metric_dict['ATAC_R2_um'].result()['R2'].numpy()))
             wandb.log({'ATAC_pearsons': metric_dict['ATAC_PearsonR'].result()['PearsonR'].numpy(),
                         'ATAC_R2': metric_dict['ATAC_R2'].result()['R2'].numpy()},
                         step=step_num)
