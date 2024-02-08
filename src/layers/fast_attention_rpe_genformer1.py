@@ -117,13 +117,13 @@ def relu_kernel_transformation(data,
     Corresponding kernel feature map.
   """
     del is_query
-    #if projection_matrix is None:
-    #    return tf.nn.relu(data) + numerical_stabilizer
-    #else:
-    ratio = 1.0 / tf.math.sqrt(
-    tf.dtypes.cast(projection_matrix.shape[0], tf.float32))
-    data_dash = ratio * tf.einsum("blhd,md->blhm", data, projection_matrix)
-    return tf.nn.relu(data_dash) + numerical_stabilizer
+    if projection_matrix is None:
+        return tf.nn.relu(data) + numerical_stabilizer
+    else:
+      ratio = 1.0 / tf.math.sqrt(
+      tf.dtypes.cast(projection_matrix.shape[0], tf.float32))
+      data_dash = ratio * tf.einsum("blhd,md->blhm", data, projection_matrix)
+      return tf.nn.relu(data_dash) + numerical_stabilizer
 
 def relu_kernel_transformation_q(data,
                                is_query,
@@ -369,7 +369,7 @@ class Attention(tf.keras.layers.Layer):
                  kernel_transformation=softmax_kernel_transformation,
                  numerical_stabilizer=0.001,
                    causal=False,
-                   nb_random_features=16,
+                   nb_random_features=256,
                    use_rot_emb = True,
                    eps = 1e-6,
                    normalize = True,
@@ -524,10 +524,13 @@ class Attention(tf.keras.layers.Layer):
 
         if self.kernel_transformation == 'relu_kernel_transformation':
             kernel_transform = relu_kernel_transformation
+            projection_matrix=None
         elif self.kernel_transformation == 'relu_kernel_transformation_q':
             kernel_transform = relu_kernel_transformation_q
+            projection_matrix=None
         else:
             kernel_transform = softmax_kernel_transformation
+            projection_matrix=self.projection_matrix
 
         dim = q.shape[-1]
         tgt_len = k.shape[1]
@@ -536,11 +539,11 @@ class Attention(tf.keras.layers.Layer):
             q,k = apply_rotary_pos_emb(q,k,rpe)
             attention_output, k_prime, q_prime = favor_attention(q, k, v,
                                        kernel_transform, self.causal,
-                                       self.projection_matrix)
+                                       projection_matrix)
         else:
             attention_output, k_prime, q_prime = favor_attention(q, k, v,
                                        kernel_transform, self.causal,
-                                       self.projection_matrix)
+                                       projection_matrix)
 
         attention_output = self.output_dense_layer(attention_output)
         return attention_output, k_prime, q_prime

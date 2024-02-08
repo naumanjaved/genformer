@@ -573,7 +573,6 @@ def parse_args(parser):
     parser.add_argument('--dropout_rate', default="0.40", help='dropout_rate')
     parser.add_argument('--pointwise_dropout_rate', default="0.05", help='pointwise_dropout_rate')
     parser.add_argument('--num_heads', default="8", help='num_heads')
-    parser.add_argument('--num_random_features', type=str, default="256", help='num_random_features')
     parser.add_argument('--BN_momentum', type=float, default=0.80, help='BN_momentum')
     parser.add_argument('--kernel_transformation', type=str, default="relu_kernel_transformation", help='kernel_transformation')
     parser.add_argument('--savefreq', type=int, help='savefreq')

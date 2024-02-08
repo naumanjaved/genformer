@@ -31,7 +31,7 @@ class genformer(tf.keras.Model):
                  filter_list_atac: list = [32, 64],
                  final_point_scale: int = 6,
                  num_motifs: int = 693,
-                 motif_dropout_rate: float = 0.25,
+                 motif_dropout_rate: float = 0.15,
                  motif_units_fc: int = 32,
                  name: str = 'genformer',
                  **kwargs):
@@ -154,6 +154,7 @@ class genformer(tf.keras.Model):
 
         # dropout for TF activity
         self.motif_dropout1=kl.Dropout(rate=self.motif_dropout_rate, **kwargs)
+        self.motif_dropout2=kl.Dropout(rate=self.motif_dropout_rate/4, **kwargs)
         # dense layer for motif activity
         self.motif_activity_fc1 = kl.Dense(
             self.motif_units_fc,
@@ -236,6 +237,7 @@ class genformer(tf.keras.Model):
         motif_activity = self.motif_activity_fc1(motif_activity)
         motif_activity = self.motif_dropout1(motif_activity,training=training)
         motif_activity = self.motif_activity_fc2(motif_activity)
+        motif_activity = self.motif_dropout2(motif_activity,training=training)
         motif_activity = tf.tile(motif_activity, [1, self.output_length, 1])
 
         transformer_input = tf.concat([sequence,atac_x, motif_activity], 
