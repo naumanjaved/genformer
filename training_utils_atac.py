@@ -15,7 +15,7 @@ tf.keras.backend.set_floatx('float32')
 
 def return_train_val_functions(model, optimizer,
                                strategy, metric_dict, num_replicas,
-                               loss_type,total_weight=0.15):
+                               loss_type,total_weight=0.15,unmask_loss=False):
     """Return training, validation, and build step functions
     Args:
         model: the input genformer model
@@ -37,8 +37,9 @@ def return_train_val_functions(model, optimizer,
     metric_dict['ATAC_PearsonR'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
     metric_dict['ATAC_R2'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
 
-    metric_dict['ATAC_PearsonR_um'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
-    metric_dict['ATAC_R2_um'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
+    if unmask_loss: 
+        metric_dict['ATAC_PearsonR_um'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
+        metric_dict['ATAC_R2_um'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
 
     if loss_type == 'poisson_multinomial':
         def loss_fn(y_true,y_pred, total_weight=total_weight, epsilon=1e-6, rescale=True):
@@ -52,7 +53,7 @@ def return_train_val_functions(model, optimizer,
     @tf.function(reduce_retracing=True)
     def dist_train_step(inputs): # main train step
         print('tracing training step!') # just to make sure no retracing occurring
-        sequence,atac,mask,target,motif_activity =inputs
+        sequence,atac,mask,unmask,target,motif_activity =inputs
 
         input_tuple = sequence, atac, motif_activity
 
@@ -60,12 +61,18 @@ def return_train_val_functions(model, optimizer,
             output_profile = model(input_tuple, training=True)
             output_profile = tf.cast(output_profile,dtype=tf.float32)
 
-            loss = tf.reduce_mean(loss_fn(target, output_profile)) * (1.0/num_replicas)
-
             mask_indices = tf.where(mask == 1) # extract indices of masked bins
             target_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(target, mask_indices), axis=0), axis=2)
             output_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_profile, mask_indices), axis=0), axis=2)
-            
+
+            loss = tf.reduce_mean(loss_fn(target_atac, output_atac)) * (1.0/num_replicas)
+
+            if unmask_loss:
+                unmask_indices = tf.where(unmask == 1) # extract indices of masked bins
+                target_atac_um = tf.expand_dims(tf.expand_dims(tf.gather_nd(target, unmask_indices), axis=0), axis=2)
+                output_atac_um = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_profile, unmask_indices), axis=0), axis=2)
+                loss += tf.reduce_mean(loss_fn(target_atac_um, output_atac_um)) * (1.0/num_replicas)
+
         gradients = tape.gradient(loss, model.trainable_variables)
         optimizer.apply_gradients(zip(gradients,  model.trainable_variables))
 
@@ -78,29 +85,30 @@ def return_train_val_functions(model, optimizer,
     @tf.function(reduce_retracing=True)
     def dist_val_step(inputs):  # main validation step 
         print('tracing validation step!')
-        sequence,atac,mask,target,motif_activity =inputs
+        sequence,atac,mask,unmask,target,motif_activity =inputs
         input_tuple = sequence,atac,motif_activity
         output_profile = model(input_tuple, training=False)
         output_profile = tf.cast(output_profile,dtype=tf.float32)
-
-        loss = tf.reduce_mean(loss_fn(target, output_profile)) * (1.0/num_replicas)
 
         mask_indices = tf.where(mask == 1) # extract indices of masked bins
         target_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(target, mask_indices), axis=0), axis=2)
         output_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_profile, mask_indices), axis=0), axis=2)
 
-        ## unmasked_loss
-        mask_indices_um = tf.where(mask == 0) # extract indices of unasked bins
-        target_atac_um = tf.expand_dims(tf.expand_dims(tf.gather_nd(target, mask_indices_um), axis=0), axis=2)
-        output_atac_um = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_profile, mask_indices_um), axis=0), axis=2)
+        loss = tf.reduce_mean(loss_fn(target_atac, output_atac)) * (1.0/num_replicas)
+
+        if unmask_loss:
+            unmask_indices = tf.where(unmask == 1) # extract indices of masked bins
+            target_atac_um = tf.expand_dims(tf.expand_dims(tf.gather_nd(target, unmask_indices), axis=0), axis=2)
+            output_atac_um = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_profile, unmask_indices), axis=0), axis=2)
+            loss += tf.reduce_mean(loss_fn(target_atac_um, output_atac_um)) * (1.0/num_replicas)
+            metric_dict['ATAC_PearsonR_um'].update_state(target_atac_um, output_atac_um)
+            metric_dict['ATAC_R2_um'].update_state(target_atac_um, output_atac_um)
 
         metric_dict["val_loss"].update_state(loss)
         metric_dict['ATAC_PearsonR'].update_state(target_atac, output_atac)
         metric_dict['ATAC_R2'].update_state(target_atac, output_atac)
-        metric_dict['ATAC_PearsonR_um'].update_state(target_atac_um, output_atac_um)
-        metric_dict['ATAC_R2_um'].update_state(target_atac_um, output_atac_um)
 
-    
+
     def build_step(iterator): # just to build the model
         @tf.function(reduce_retracing=True)
         def val_step(inputs):
@@ -196,7 +204,7 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
         motif_activity = tf.zeros_like(motif_activity)
 
     # generate ATAC mask 
-    full_comb_mask, full_comb_mask_store = mask_ATAC_profile(
+    full_comb_mask, full_comb_mask_store,full_comb_unmask_store= mask_ATAC_profile(
                                                 output_length_ATAC,
                                                 output_length,
                                                 crop_size,
@@ -224,6 +232,7 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
         masked_atac = tf.reverse(masked_atac,axis=[0])
         full_comb_mask = tf.reverse(full_comb_mask,axis=[0])
         full_comb_mask_store=tf.reverse(full_comb_mask_store,axis=[0])
+        full_comb_unmask_store =tf.reverse(full_comb_unmask_store,axis=[0])
 
     # generate the output atac profile by summing the inputs to a desired resolution
     tiling_req = output_length_ATAC // output_length ### how much do we need to tile the atac signal to desired length
@@ -251,6 +260,7 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
                                    [input_length,4]),dtype=tf.bfloat16), \
                 tf.cast(masked_atac,dtype=tf.bfloat16), \
                 tf.cast(full_comb_mask_store,dtype=tf.int32), \
+                tf.cast(full_comb_unmask_store,dtype=tf.int32), \
                 tf.cast(atac_out,dtype=tf.float32), \
                 tf.cast(motif_activity,dtype=tf.bfloat16)
 
@@ -341,7 +351,7 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
         motif_activity = tf.zeros_like(motif_activity)
 
     # generate ATAC mask 
-    full_comb_mask, full_comb_mask_store = mask_ATAC_profile(
+    full_comb_mask, full_comb_mask_store,full_comb_unmask_store = mask_ATAC_profile(
                                                 output_length_ATAC,
                                                 output_length,
                                                 crop_size,
@@ -368,6 +378,7 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
         atac_target = tf.reverse(atac_target,axis=[0])
         masked_atac = tf.reverse(masked_atac,axis=[0])
         full_comb_mask_store=tf.reverse(full_comb_mask_store,axis=[0])
+        full_comb_unmask_store =tf.reverse(full_comb_unmask_store,axis=[0])
 
     # generate the output atac profile by summing the inputs to a desired resolution
     tiling_req = output_length_ATAC // output_length ### how much do we need to tile the atac signal to desired length
@@ -395,6 +406,7 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
                                    [input_length,4]),dtype=tf.bfloat16), \
                 tf.cast(masked_atac,dtype=tf.bfloat16), \
                 tf.cast(full_comb_mask_store,dtype=tf.int32), \
+                tf.cast(full_comb_unmask_store,dtype=tf.int32), \
                 tf.cast(atac_out,dtype=tf.float32), \
                 tf.cast(motif_activity,dtype=tf.bfloat16)
 
@@ -802,7 +814,15 @@ def mask_ATAC_profile(output_length_ATAC, output_length, crop_size, mask_size,ou
     if crop_size > 0:
         full_comb_mask_store = full_comb_mask_store[crop_size:-crop_size,:] # store the cropped mask
 
-    return full_comb_mask, full_comb_mask_store
+    ## generate random tensor of un-masked positions, with number of positions equal to the originally masked number of positions
+    num_masked = tf.cast(tf.math.reduce_sum(full_comb_mask_store),dtype=tf.int32)
+    zero_indices = tf.where(full_comb_mask_store == 0) # Step 2: Find indices of 0s in full_comb_mask_store
+    selected_indices = tf.random.experimental.stateless_shuffle(zero_indices,seed = [0,randomish_seed+1])[:num_masked] # Step 3: Randomly select equal number of indices as there are 1s in full_comb_mask_store
+    full_comb_unmask_store = tf.zeros_like(full_comb_mask_store,dtype=tf.int32) # Step 4: Create full_comb_unmask_store with all zeros
+    updates = tf.ones_like(selected_indices[:, 0], dtype=tf.int32) # Update full_comb_unmask_store to have 1s at selected indices
+    full_comb_unmask_store = tf.tensor_scatter_nd_update(full_comb_unmask_store, selected_indices, updates) # Since selected_indices is a 2D tensor with shape [num_ones, tensor_rank], we need to update using scatter_nd
+
+    return full_comb_mask, full_comb_mask_store, full_comb_unmask_store
 
 
 def mask_sequence(sequence, sequence_length, bin_size=32, kmer_size=1, seed=4):

@@ -117,7 +117,8 @@ def main():
             'crop_size': (int(args.output_length) - int(args.final_output_length))//2,
             'reset_optimizer_state': parse_bool_str(args.reset_optimizer_state),
             'warmup_fraction': float(args.warmup_frac),
-            'return_constant_lr': parse_bool_str(args.return_constant_lr)
+            'return_constant_lr': parse_bool_str(args.return_constant_lr),
+            'unmask_loss': parse_bool_str(args.unmask_loss)
     }
 
     wandb.init(config=config,
@@ -229,7 +230,8 @@ def main():
                 metric_dict=metric_dict,
                 num_replicas=NUM_REPLICAS,
                 loss_type=wandb.config.loss_type,
-                total_weight=wandb.config.total_weight_loss
+                total_weight=wandb.config.total_weight_loss,
+                unmask_loss=wandb.config.unmask_loss
             )
 
         val_losses = []
@@ -319,8 +321,9 @@ def main():
             wandb.log({'val_loss': val_loss}, step=step_num)
             print('ATAC_pearsons: ' + str(metric_dict['ATAC_PearsonR'].result()['PearsonR'].numpy()))
             print('ATAC_R2: ' + str(metric_dict['ATAC_R2'].result()['R2'].numpy()))
-            print('ATAC_pearsons_um: ' + str(metric_dict['ATAC_PearsonR_um'].result()['PearsonR'].numpy()))
-            print('ATAC_R2_um: ' + str(metric_dict['ATAC_R2_um'].result()['R2'].numpy()))
+            if wandb.config.unmask_loss:
+                print('ATAC_pearsons_um: ' + str(metric_dict['ATAC_PearsonR_um'].result()['PearsonR'].numpy()))
+                print('ATAC_R2_um: ' + str(metric_dict['ATAC_R2_um'].result()['R2'].numpy()))
             wandb.log({'ATAC_pearsons': metric_dict['ATAC_PearsonR'].result()['PearsonR'].numpy(),
                         'ATAC_R2': metric_dict['ATAC_R2'].result()['R2'].numpy()},
                         step=step_num)

@@ -30,7 +30,6 @@ python3 train_model_atac.py \
             --dropout_rate="0.20" \
             --pointwise_dropout_rate="0.05" \
             --num_heads="4" \
-            --num_random_features="256" \
             --kernel_transformation="relu_kernel_transformation" \
             --savefreq=1 \
             --rectify="True" \
