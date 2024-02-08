@@ -343,10 +343,11 @@ class Performer(kl.Layer):
 
     def call(self, inputs, rpe=None, training=None, **kwargs):
         x = self.layer_norm(inputs)
-        x, k_prime, q_prime = self.self_attention(tf.cast(x,dtype=tf.float32),
-                                                tf.cast(x,dtype=tf.float32),
-                                                rpe=tf.cast(rpe,dtype=tf.float32),
-                                                **kwargs)
+        x, k_prime, q_prime = self.self_attention(x,
+                                                  x,
+                                                  rpe,
+                                                  training=training,
+                                                  **kwargs)
 
         x = self.dropout(x, training=training) ## 0.40
 
@@ -483,7 +484,7 @@ class Performer_Encoder(kl.Layer):
         att_matrices={}
         #x = tf.cast(x, dtype=tf.float32)
         for idx,layer in enumerate(self.layers):
-            x += self.pos_emb(x) # c/w with lucid rains implementation
+            #x += self.pos_emb(x) # c/w with lucid rains implementation
             rpe = self.layer_pos_emb(x) ### check whether fixedpositionalembedding is c/w 
                                         ### apply_rotary_embedding + fixedposembedding in flaxformer
             x,k_prime,q_prime = layer(x, rpe=rpe, training=training)
@@ -509,8 +510,7 @@ class FixedPositionalEmbedding(tf.keras.layers.Layer):
         self.emb = tf.concat((tf.math.sin(self.sinusoid_inp),
                               tf.math.cos(self.sinusoid_inp)), axis=-1)
     def call(self, x):
-        return tf.cast(self.emb[None, :x.shape[1], :],
-                       dtype=tf.bfloat16)
+        return self.emb[None, :x.shape[1], :]
 
 @tf.keras.utils.register_keras_serializable()
 class TargetLengthCrop1D(kl.Layer):

@@ -95,8 +95,8 @@ class genformer(tf.keras.Model):
         self.motif_units_fc = motif_units_fc
         self.motif_dropout_rate= motif_dropout_rate
 
-        self.hidden_size=self.filter_list_seq[-1] + self.filter_list_atac[-1] + (self.motif_units_fc//4)
-        self.d_model = self.filter_list_seq[-1] + self.filter_list_atac[-1] + (self.motif_units_fc//4)
+        self.hidden_size=self.filter_list_seq[-1] #+ self.filter_list_atac[-1] + (self.motif_units_fc//4)
+        self.d_model = self.filter_list_seq[-1] #+ self.filter_list_atac[-1] + (self.motif_units_fc//4)
 
         self.dim = self.hidden_size  // self.num_heads
 
@@ -168,7 +168,12 @@ class genformer(tf.keras.Model):
             kernel_initializer='lecun_normal',
             bias_initializer='zeros',
             use_bias=True)
-
+        
+        self.pre_transformer_projection = kl.Dense(self.hidden_size,
+                                                   activation=None,
+                                                    kernel_initializer='lecun_normal',
+                                                    use_bias=False)
+        
         # Performer attention
         self.performer = Performer_Encoder(
             num_layers=self.num_transformer_layers,
@@ -209,13 +214,6 @@ class genformer(tf.keras.Model):
         self.dropout = kl.Dropout(rate=self.pointwise_dropout_rate,
                                   **kwargs)
         self.gelu = tfa.layers.GELU()
-
-        self.motif_activity_LN = kl.LayerNormalization(axis=-1,
-                                                       scale=True,
-                                                       center=False,
-                                                       epsilon=1e-05,
-                                                       beta_initializer="zeros",
-                                                       gamma_initializer="ones")
 
 
     def call(self, inputs, training:bool=True):

@@ -28,7 +28,7 @@ python3 train_model_atac.py \
             --epsilon=1.0e-8 \
             --num_transformer_layers="10" \
             --dropout_rate="0.20" \
-            --pointwise_dropout_rate="0.10" \
+            --pointwise_dropout_rate="0.05" \
             --num_heads="4" \
             --num_random_features="256" \
             --kernel_transformation="relu_kernel_transformation" \
@@ -41,7 +41,7 @@ python3 train_model_atac.py \
             --log_atac="False" \
             --random_mask_size="1536" \
             --use_atac="True" \
-            --final_point_scale="6" \
+            --final_point_scale="4" \
             --use_seq="True" \
             --atac_corrupt_rate="15" \
             --use_motif_activity="True" \

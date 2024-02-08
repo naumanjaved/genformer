@@ -68,9 +68,9 @@ def return_train_val_functions(model, optimizer,
             target_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(target, mask_indices), axis=0), axis=2)
             output_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_profile, mask_indices), axis=0), axis=2)
 
-            ## masked loss 
+            ## masked loss
             loss_masked = tf.reduce_mean(loss_fn(target_atac, output_atac)) * (1.0/num_replicas)
-
+            
             ## unmasked_loss
             mask_indices_um = tf.where(mask == 0) # extract indices of unmasked bins
             # subset target and predictions to masked bins
