@@ -32,9 +32,6 @@ def return_train_val_functions(model, optimizer,
     metric_dict["train_loss"] = tf.keras.metrics.Mean("train_loss", dtype=tf.float32)
     metric_dict["val_loss"] = tf.keras.metrics.Mean("val_loss",  dtype=tf.float32)
 
-    metric_dict["train_loss_um"] = tf.keras.metrics.Mean("train_loss_um", dtype=tf.float32)
-    metric_dict["val_loss_um"] = tf.keras.metrics.Mean("val_loss_um",  dtype=tf.float32)
-
     metric_dict['ATAC_PearsonR_tr'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
     metric_dict['ATAC_R2_tr'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
     metric_dict['ATAC_PearsonR'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
@@ -63,31 +60,20 @@ def return_train_val_functions(model, optimizer,
             output_profile = model(input_tuple, training=True)
             output_profile = tf.cast(output_profile,dtype=tf.float32)
 
+            loss = tf.reduce_mean(loss_fn(target, output_profile)) * (1.0/num_replicas)
+
             mask_indices = tf.where(mask == 1) # extract indices of masked bins
-            # subset target and predictions to masked bins
             target_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(target, mask_indices), axis=0), axis=2)
             output_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_profile, mask_indices), axis=0), axis=2)
-
-            ## masked loss
-            loss_masked = tf.reduce_mean(loss_fn(target_atac, output_atac)) * (1.0/num_replicas)
             
-            ## unmasked_loss
-            mask_indices_um = tf.where(mask == 0) # extract indices of unmasked bins
-            # subset target and predictions to masked bins
-            target_atac_um = tf.expand_dims(tf.expand_dims(tf.gather_nd(target, mask_indices_um), axis=0), axis=2)
-            output_atac_um = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_profile, mask_indices_um), axis=0), axis=2)
-            loss_unmasked = tf.reduce_mean(loss_fn(target_atac_um, output_atac_um)) * (1.0/num_replicas)
-            
-            loss = loss_masked + loss_unmasked
-
         gradients = tape.gradient(loss, model.trainable_variables)
         optimizer.apply_gradients(zip(gradients,  model.trainable_variables))
 
         # update metrics for train step, compute pearsons just over the masked regions
         metric_dict["train_loss"].update_state(loss)
-        metric_dict["train_loss_um"].update_state(loss_unmasked)
         metric_dict['ATAC_PearsonR_tr'].update_state(target_atac, output_atac)
         metric_dict['ATAC_R2_tr'].update_state(target_atac, output_atac)
+
 
     @tf.function(reduce_retracing=True)
     def dist_val_step(inputs):  # main validation step 
@@ -97,21 +83,18 @@ def return_train_val_functions(model, optimizer,
         output_profile = model(input_tuple, training=False)
         output_profile = tf.cast(output_profile,dtype=tf.float32)
 
+        loss = tf.reduce_mean(loss_fn(target, output_profile)) * (1.0/num_replicas)
+
         mask_indices = tf.where(mask == 1) # extract indices of masked bins
         target_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(target, mask_indices), axis=0), axis=2)
         output_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_profile, mask_indices), axis=0), axis=2)
-        loss_masked = tf.reduce_mean(loss_fn(target_atac, output_atac)) * (1.0/num_replicas)
 
         ## unmasked_loss
         mask_indices_um = tf.where(mask == 0) # extract indices of unasked bins
         target_atac_um = tf.expand_dims(tf.expand_dims(tf.gather_nd(target, mask_indices_um), axis=0), axis=2)
         output_atac_um = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_profile, mask_indices_um), axis=0), axis=2)
-        loss_unmasked = tf.reduce_mean(loss_fn(target_atac_um, output_atac_um)) * (1.0/num_replicas)
-        
-        loss = loss_masked + loss_unmasked
 
         metric_dict["val_loss"].update_state(loss)
-        metric_dict["val_loss_um"].update_state(loss_unmasked)
         metric_dict['ATAC_PearsonR'].update_state(target_atac, output_atac)
         metric_dict['ATAC_R2'].update_state(target_atac, output_atac)
         metric_dict['ATAC_PearsonR_um'].update_state(target_atac_um, output_atac_um)
@@ -187,9 +170,13 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
     # atac input, cast to float32 
     atac = tf.cast(tf.ensure_shape(tf.io.parse_tensor(data['atac'], out_type=tf.float16), 
                                    [output_length_ATAC,1]),dtype=tf.float32)
-    atac = atac + tf.math.abs(g.normal(atac.shape,mean=1.0e-04,stddev=1.0e-04,dtype=tf.float32))
-
     atac_target = atac ## store the target ATAC, as we will subsequently directly manipulate atac for masking
+    noise = tf.math.abs(tf.random.normal(atac.shape, mean=0.0, stddev=1.0e-04, dtype=tf.float32))
+    mask = tf.math.not_equal(atac, 0)
+    mask = tf.cast(mask, dtype=tf.float32)
+    atac = atac + mask * noise
+
+    #atac = atac + tf.math.abs(g.normal(atac.shape,mean=1.0e-05,stddev=1.0e-05,dtype=tf.float32))
     # get peaks centers 
     peaks_center = tf.expand_dims(tf.io.parse_tensor(data['peaks_center'], out_type=tf.int32), 
                                   axis=1)
@@ -313,9 +300,11 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
     # atac input, cast to float32 
     atac = tf.ensure_shape(tf.io.parse_tensor(data['atac'], out_type=tf.float16), [output_length_ATAC,1])
     atac = tf.cast(atac,dtype=tf.float32)
-    atac = atac + tf.math.abs(g_val.normal(atac.shape,mean=1.0e-04,stddev=1.0e-04,dtype=tf.float32))
-
     atac_target = atac ## store the target ATAC, as we will subsequently directly manipulate atac for masking
+    noise = tf.math.abs(tf.random.normal(atac.shape, mean=0.0, stddev=1.0e-04, dtype=tf.float32))
+    mask = tf.math.not_equal(atac, 0)
+    mask = tf.cast(mask, dtype=tf.float32)
+    atac = atac + mask * noise
 
     # set up a semi-random seem based on the number of
     # peaks and atac signal in the window

@@ -297,7 +297,6 @@ def main():
             print('lr at:' + str(optimizer.lr.values[0]))
             train_loss = metric_dict['train_loss'].result().numpy() #this is the per example loss * NUM_REPLICAS # multiply by NUM_REPLICAS to get total loss
             print('train_loss: ' + str(train_loss))
-            print('train_loss_um: ' + str(metric_dict['train_loss_um'].result().numpy()))
 
             wandb.log({'train_loss': train_loss},
                         step=step_num)
@@ -317,7 +316,6 @@ def main():
 
             val_loss = metric_dict['val_loss'].result().numpy() #this is the per example loss # multiply by NUM_REPLICAS to get total loss 
             print('val_loss: ' + str(val_loss))
-            print('val_loss_um: ' + str(metric_dict['val_loss_um'].result().numpy()))
 
             val_losses.append(val_loss)
             wandb.log({'val_loss': val_loss}, step=step_num)
