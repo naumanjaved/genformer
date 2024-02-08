@@ -112,7 +112,7 @@ def return_train_val_functions(model, optimizer,
     def build_step(iterator): # just to build the model
         @tf.function(reduce_retracing=True)
         def val_step(inputs):
-            sequence,atac,mask,target,motif_activity =inputs
+            sequence,atac,mask,unmask,target,motif_activity =inputs
             input_tuple = sequence,atac,motif_activity
             model(input_tuple, training=False)
 
