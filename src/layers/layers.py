@@ -358,7 +358,6 @@ class Performer_Encoder(kl.Layer):
                  dim,
                  d_model,
                  max_seq_length,
-                 nb_random_features,
                  hidden_size,
                  numerical_stabilizer,
                  dropout_rate = 0.40,
@@ -379,7 +378,6 @@ class Performer_Encoder(kl.Layer):
             num_heads: num attention heads
             attention_dropout: post attention layer dropout rate
             numerical_stabilizer: small float for stability
-            nb_random_features: dim for projection matrix
             widening: scaling factor for how many channels to start w/
                       e.g. widening = 2, num_channels = 12 means start w/ 24
             dropout_rate: transformer MLP dropout rate
@@ -394,7 +392,6 @@ class Performer_Encoder(kl.Layer):
         self.hidden_size=hidden_size
         self.d_model=d_model
         self.max_seq_length=max_seq_length
-        self.nb_random_features=nb_random_features
         self.numerical_stabilizer=numerical_stabilizer
         self.use_rot_emb=use_rot_emb
         self.normalize=normalize
@@ -411,7 +408,6 @@ class Performer_Encoder(kl.Layer):
                                  num_heads=self.num_heads, # 8
                                  dropout_rate=self.dropout_rate, #
                                  numerical_stabilizer=self.numerical_stabilizer, # 1.0e-03
-                                 nb_random_features=self.nb_random_features, # ignore
                                  max_seq_length=self.max_seq_length, # 8192
                                  kernel_transformation=self.kernel_transformation, # relu
                                  seed=self.seed, # use whatever
@@ -454,7 +450,6 @@ class Performer_Encoder(kl.Layer):
             "hidden_size":self.hidden_size,
             "num_heads":self.num_heads,
             "numerical_stabilizer":self.numerical_stabilizer,
-            "nb_random_features":self.nb_random_features,
             "kernel_transformation":self.kernel_transformation,
             "num_layers":self.num_layers,
             "dim":self.dim,

@@ -19,7 +19,6 @@ class genformer(tf.keras.Model):
                  final_output_length: int = 4092,
                  num_heads:int = 4,
                  numerical_stabilizer: float =0.001,
-                 nb_random_features:int = 256,
                  num_transformer_layers:int = 7,
                  norm=True,
                  max_seq_length:int = 1536,
@@ -52,7 +51,6 @@ class genformer(tf.keras.Model):
              - final_output_length: length of final output profile after cropping
              - num_heads: number of heads for Performer attention
              - numerical_stabilizer: numerical stabilizer for Performer attention
-             - nb_random_features: number of random features for Performer attention
              - num_transformer_layers: number of layers for Performer attention
              - norm: whether to use layer normalization in Performer attention
              - max_seq_length: maximum sequence length for Performer attention
@@ -78,7 +76,6 @@ class genformer(tf.keras.Model):
         self.num_heads = num_heads
         self.input_length = input_length
         self.numerical_stabilizer = numerical_stabilizer
-        self.nb_random_features = nb_random_features
         self.num_transformer_layers = num_transformer_layers
         self.output_length = output_length
         self.final_output_length = final_output_length
@@ -183,7 +180,6 @@ class genformer(tf.keras.Model):
             d_model=self.d_model,
             norm=self.norm,
             max_seq_length=self.max_seq_length,
-            nb_random_features=self.nb_random_features,
             hidden_size=self.hidden_size,
             numerical_stabilizer=self.numerical_stabilizer,
             dropout_rate=self.dropout_rate,
@@ -262,7 +258,6 @@ class genformer(tf.keras.Model):
             "num_heads": self.num_heads,
             "input_length": self.input_length,
             "numerical_stabilizer": self.numerical_stabilizer,
-            "nb_random_features": self.nb_random_features,
             "num_transformer_layers": self.num_transformer_layers,
             "output_length": self.output_length,
             "final_output_length": self.final_output_length,
