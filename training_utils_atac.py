@@ -71,7 +71,7 @@ def return_train_val_functions(model, optimizer,
                 unmask_indices = tf.where(unmask == 1) # extract indices of masked bins
                 target_atac_um = tf.expand_dims(tf.expand_dims(tf.gather_nd(target, unmask_indices), axis=0), axis=2)
                 output_atac_um = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_profile, unmask_indices), axis=0), axis=2)
-                loss += tf.reduce_mean(loss_fn(target_atac_um, output_atac_um)) * (1.0/num_replicas)
+                loss += (tf.reduce_mean(loss_fn(target_atac_um, output_atac_um)) * (1.0/num_replicas))
 
         gradients = tape.gradient(loss, model.trainable_variables)
         optimizer.apply_gradients(zip(gradients,  model.trainable_variables))
@@ -100,7 +100,7 @@ def return_train_val_functions(model, optimizer,
             unmask_indices = tf.where(unmask == 1) # extract indices of masked bins
             target_atac_um = tf.expand_dims(tf.expand_dims(tf.gather_nd(target, unmask_indices), axis=0), axis=2)
             output_atac_um = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_profile, unmask_indices), axis=0), axis=2)
-            loss += tf.reduce_mean(loss_fn(target_atac_um, output_atac_um)) * (1.0/num_replicas)
+            loss += (tf.reduce_mean(loss_fn(target_atac_um, output_atac_um)) * (1.0/num_replicas))
             metric_dict['ATAC_PearsonR_um'].update_state(target_atac_um, output_atac_um)
             metric_dict['ATAC_R2_um'].update_state(target_atac_um, output_atac_um)
 
@@ -165,10 +165,17 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
     ## here we need to set up some random numbers to achieve data augmentation
     atac_mask_int = g.uniform([], 0, atac_corrupt_rate, dtype=tf.int32) # random increase ATAC masking w/ 1/atac_corrupt_rate prob. 
     randomish_seed = g.uniform([], 0, 100000000,dtype=tf.int32) # work-around to ensure random-ish stateless operations
-    shift = g.uniform(shape=(), minval=0, maxval=max_shift, dtype=tf.int32)
-    
-    rev_comp = tf.math.round(g.uniform([], 0, 1)) #switch for random reverse complementation
-    
+    shift = tf.random.stateless_uniform(shape=(),
+                        minval=0,
+                        maxval=max_shift,
+                        seed=[randomish_seed+1,randomish_seed+1],
+                        dtype=tf.int32)
+
+    rev_comp = tf.random.stateless_uniform(shape=[],
+                                                minval=0,
+                                                maxval=2,
+                                                seed=[randomish_seed+2,randomish_seed+6], 
+                                                dtype=tf.int32)
     # parse out the actual data 
     data = tf.io.parse_example(serialized_example, feature_map)
 
@@ -327,9 +334,17 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
 
     randomish_seed = peaks_sum + tf.cast(tf.reduce_sum(atac),dtype=tf.int32)
 
-    rev_comp = tf.math.round(g_val.uniform([], 0, 1)) #switch for random reverse complementation
-    
-    shift = g_val.uniform(shape=(), minval=0, maxval=max_shift, dtype=tf.int32)
+    shift = tf.random.stateless_uniform(shape=(),
+                        minval=0,
+                        maxval=max_shift,
+                        seed=[randomish_seed+1,randomish_seed+7],
+                        dtype=tf.int32)
+
+    rev_comp = tf.random.stateless_uniform(shape=[],
+                                                minval=0,
+                                                maxval=2,
+                                                seed=[randomish_seed+3,randomish_seed+5], 
+                                                dtype=tf.int32)
     
     rev_comp = tf.math.round(g_val.uniform([], 0, 1)) #switch for random reverse complementation
     

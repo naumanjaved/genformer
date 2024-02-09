@@ -64,8 +64,7 @@ def create_projection_matrix(m, d, seed=0, scaling=0, struct_mode=False):
     else:
         raise ValueError("Scaling must be one of {0, 1}. Was %s" % scaling)
 
-    return tf.cast(tf.linalg.matmul(tf.linalg.diag(multiplier), final_matrix),
-                   dtype=tf.float32)
+    return tf.linalg.matmul(tf.linalg.diag(multiplier), final_matrix)
 
 
 def create_products_of_givens_rotations(dim, seed):
@@ -116,14 +115,14 @@ def relu_kernel_transformation(data,
   Returns:
     Corresponding kernel feature map.
   """
-    del is_query
-    if projection_matrix is None:
-        return tf.nn.relu(data) + numerical_stabilizer
-    else:
-      ratio = 1.0 / tf.math.sqrt(
-      tf.dtypes.cast(projection_matrix.shape[0], tf.float32))
-      data_dash = ratio * tf.einsum("blhd,md->blhm", data, projection_matrix)
-      return tf.nn.relu(data_dash) + numerical_stabilizer
+    #del is_query
+    #if projection_matrix is None:
+    #    return tf.nn.relu(data) + numerical_stabilizer
+    #else:
+    ratio = 1.0 / tf.math.sqrt(
+    tf.dtypes.cast(projection_matrix.shape[0], tf.float32))
+    data_dash = ratio * tf.einsum("blhd,md->blhm", data, projection_matrix)
+    return tf.nn.relu(data_dash) + numerical_stabilizer
 
 def relu_kernel_transformation_q(data,
                                is_query,
@@ -366,14 +365,14 @@ class Attention(tf.keras.layers.Layer):
     def __init__(self,
                  hidden_size,
                  num_heads,
-                 kernel_transformation=softmax_kernel_transformation,
+                 kernel_transformation=relu_kernel_transformation,
                  numerical_stabilizer=0.001,
-                   causal=False,
-                   nb_random_features=256,
-                   use_rot_emb = True,
-                   eps = 1e-6,
-                   normalize = True,
-                   seed=42,
+                  causal=False,
+                  nb_random_features=256,
+                  use_rot_emb = True,
+                  eps = 1e-6,
+                  normalize = True,
+                  seed=42,
                  q_init=None,
                  k_init=None,
                  v_init=None,
@@ -421,11 +420,6 @@ class Attention(tf.keras.layers.Layer):
         self.v_init=v_init
         self.att_output=att_output
 
-
-## Removed projection matrix type since the call is throwing issues
-
-
-
     def build(self, input_shape):
         """Builds the layer."""
     # Layers for linearly projecting the queries, keys, and values.
@@ -440,17 +434,17 @@ class Attention(tf.keras.layers.Layer):
         self.query_dense_layer = util.DenseEinsum(
             output_shape=(self.num_heads, size_per_head),
             kernel_initializer=self.q_init if self.load_init else attention_initializer,
-            use_bias=False,
+            use_bias=True,
             name="query")
         self.key_dense_layer = util.DenseEinsum(
             output_shape=(self.num_heads, size_per_head),
             kernel_initializer=self.k_init if self.load_init else attention_initializer,
-            use_bias=False,
+            use_bias=True,
             name="key")
         self.value_dense_layer = util.DenseEinsum(
             output_shape=(self.num_heads, size_per_head),
             kernel_initializer=self.v_init if self.load_init else attention_initializer,
-            use_bias=False,
+            use_bias=True,
             name="value")
 
         output_initializer = _glorot_initializer(self.hidden_size, self.hidden_size)
@@ -524,13 +518,12 @@ class Attention(tf.keras.layers.Layer):
 
         if self.kernel_transformation == 'relu_kernel_transformation':
             kernel_transform = relu_kernel_transformation
-            projection_matrix=None
+
         elif self.kernel_transformation == 'relu_kernel_transformation_q':
             kernel_transform = relu_kernel_transformation_q
-            projection_matrix=None
+
         else:
             kernel_transform = softmax_kernel_transformation
-            projection_matrix=self.projection_matrix
 
         dim = q.shape[-1]
         tgt_len = k.shape[1]
@@ -539,11 +532,11 @@ class Attention(tf.keras.layers.Layer):
             q,k = apply_rotary_pos_emb(q,k,rpe)
             attention_output, k_prime, q_prime = favor_attention(q, k, v,
                                        kernel_transform, self.causal,
-                                       projection_matrix)
+                                       self.projection_matrix)
         else:
             attention_output, k_prime, q_prime = favor_attention(q, k, v,
                                        kernel_transform, self.causal,
-                                       projection_matrix)
+                                       self.projection_matrix)
 
         attention_output = self.output_dense_layer(attention_output)
         return attention_output, k_prime, q_prime

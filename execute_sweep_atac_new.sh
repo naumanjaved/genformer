@@ -53,5 +53,5 @@ python3 train_model_atac.py \
             --val_data_seed=1 \
             --loss_type="poisson" \
             --model_save_basename="genformer" \
-            --warmup_frac=4.0 \
+            --warmup_frac=3.0 \
             --decay_steps=75000

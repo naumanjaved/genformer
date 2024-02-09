@@ -113,13 +113,13 @@ class genformer(tf.keras.Model):
         # convolutional stem for ATAC profile
         self.stem_conv_atac = tf.keras.layers.Conv1D(
             filters=32,
-            kernel_size=15,
+            kernel_size=50,
             kernel_initializer='lecun_normal',
             bias_initializer='zeros',
             strides=1,
             dilation_rate=1,
             padding='same')
-        self.stem_res_conv_atac =Residual(conv_block(32, 1, 
+        self.stem_res_conv_atac =Residual(conv_block(32, 1,
                                                     BN_momentum=self.BN_momentum,
                                                     name='pointwise_conv_block_atac'))
         self.stem_pool_atac = tf.keras.layers.MaxPooling1D(pool_size=2)
@@ -140,7 +140,7 @@ class genformer(tf.keras.Model):
         self.conv_tower_atac = tf.keras.Sequential([
             tf.keras.Sequential([
                 conv_block(filters=num_filters,
-                               width=50,
+                               width=5,
                                dilation_rate=1,
                                stride=1,
                                BN_momentum=self.BN_momentum,
@@ -242,10 +242,10 @@ class genformer(tf.keras.Model):
         out_performer,att_matrices = self.performer(transformer_input, training=training)
         
         out = self.final_pointwise_conv(out_performer, training=training) ##
-        out = self.crop_final(out) ## tom crops only on loss, tom will try cropping less 
         out = self.dropout(out, training=training) ## 0.05 default in tom's implementation
         out = self.gelu(out)
         out = self.final_dense_profile(out, training=training)
+        out = self.crop_final(out) ## tom crops only on loss, tom will try cropping less 
 
         return out
 
