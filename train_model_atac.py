@@ -331,8 +331,9 @@ def main():
             duration = (time.time() - start) / 60.
             print('completed epoch ' + str(epoch_idx + 1 + wandb.config.num_epochs_to_start) + ' validation - duration(mins): ' + str(duration))
 
-            if val_loss < min(val_losses[:-1]):
-                best_val_loss.assign(val_loss)
+            if len(val_losses) > 1:
+                if val_loss < min(val_losses[:-1]):
+                    best_val_loss.assign(val_loss)
 
             # Start early stopping checks:
             # - After epoch one if not loading from a checkpoint
