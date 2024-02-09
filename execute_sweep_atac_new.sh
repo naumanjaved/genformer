@@ -28,8 +28,8 @@ python3 train_model_atac.py \
             --epsilon=1.0e-8 \
             --num_transformer_layers="10" \
             --dropout_rate="0.20" \
-            --pointwise_dropout_rate="0.05" \
-            --num_heads="4" \
+            --pointwise_dropout_rate="0.10" \
+            --num_heads="8" \
             --kernel_transformation="relu_kernel_transformation" \
             --savefreq=1 \
             --rectify="True" \
@@ -46,13 +46,12 @@ python3 train_model_atac.py \
             --use_motif_activity="True" \
             --total_weight_loss="0.15" \
             --use_rot_emb="True" \
-            --best_val_loss=100.0 \
             --lr_base="5.0e-04" \
             --decay_frac="0.10" \
-            --gradient_clip="5.0" \
+            --gradient_clip="2.5" \
             --seed=1 \
             --val_data_seed=1 \
             --loss_type="poisson" \
             --model_save_basename="genformer" \
-            --warmup_frac=3.0 \
-            --decay_steps=50000
+            --warmup_frac=4.0 \
+            --decay_steps=75000

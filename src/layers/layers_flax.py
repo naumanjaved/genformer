@@ -9,7 +9,7 @@ import tensorflow as tf
 import tensorflow_addons as tfa
 from tensorflow.keras import layers as kl
 #import src.layers.fast_attention as fa
-import src.layers.fast_attention_rpe_genformer1 as fa_rpe
+import src.layers.fast_attention_rpe_flaxformer_compatible as fa_rpe
 import src.utils as utils
 from tensorflow.keras import regularizers
 from tensorflow.keras.layers.experimental import SyncBatchNormalization as syncbatchnorm
@@ -17,16 +17,18 @@ from tensorflow.keras.layers.experimental import SyncBatchNormalization as syncb
 @tf.keras.utils.register_keras_serializable()
 class SoftmaxPooling1D(kl.Layer):
     """Softmax pooling layer."""
-    def __init__(self,
+    def __init__(self,num_features,kernel_init=None,
                  pool_size=2, w_init_scale=2.0, name='softmax_pooling', **kwargs):
         super().__init__(name=name, **kwargs)
         self.pool_size = pool_size
         self.w_init_scale = w_init_scale
+        self.num_features = num_features
+        self.kernel_init=kernel_init
 
         self.dense = kl.Dense(
-            units = 1,
+            units = self.num_features,
             use_bias=False,
-            kernel_initializer=tf.keras.initializers.Identity(gain=self.w_init_scale))
+            kernel_initializer=tf.keras.initializers.Identity(gain=self.w_init_scale) if self.kernel_init is not None else self.kernel_init)
 
     def call(self, inputs, **kwargs):
         _, length, num_features = inputs.shape
@@ -75,24 +77,24 @@ def conv_block(
     return tf.keras.Sequential([
         tf.keras.layers.BatchNormalization(
             axis=-1, 
-            synchronized=True, 
-            center=True, 
-            scale=True, 
+            synchronized=True,
+            center=True,
+            scale=True,
             beta_initializer=beta_init if (beta_init is not None) else "zeros",
             gamma_initializer=gamma_init if (gamma_init is not None) else "ones",
-            momentum=BN_momentum, 
-            epsilon=1.0e-05, 
+            momentum=BN_momentum,
+            epsilon=1.0e-05,
             moving_mean_initializer=mean_init if (mean_init is not None) else "zeros",
             moving_variance_initializer=var_init if (var_init is not None) else "ones", **kwargs),
         tfa.layers.GELU(),
         tf.keras.layers.Conv1D(
-            filters, 
-            width, 
+            filters,
+            width,
             kernel_initializer=k_init if (k_init is not None) else 'lecun_normal',
             bias_initializer=b_init if (b_init is not None) else 'zeros',
-            strides=stride, 
-            dilation_rate=dilation_rate, 
-            padding=padding, 
+            strides=stride,
+            dilation_rate=dilation_rate,
+            padding=padding,
             **kwargs)
         ], name=name)
 
@@ -136,7 +138,6 @@ class FFN(kl.Layer):
                  num_channels: int,
                  dropout_rate: float,
                    FFN_LN_gamma_init=None,
-                   FFN_LN_beta_init=None,
                    FFN_kernel1_init=None,
                    FFN_bias1_init=None,
                    FFN_kernel2_init=None,
@@ -158,7 +159,6 @@ class FFN(kl.Layer):
         self.ffn_dropout = dropout_rate
         self.load_init=load_init
         self.FFN_LN_gamma_init=FFN_LN_gamma_init,
-        self.FFN_LN_beta_init=FFN_LN_beta_init
         self.FFN_kernel1_init=FFN_kernel1_init
         self.FFN_bias1_init=FFN_bias1_init
         self.FFN_kernel2_init=FFN_kernel2_init
@@ -166,16 +166,14 @@ class FFN(kl.Layer):
 
         self.FFN_layer_norm = kl.LayerNormalization(axis=-1,
                                                   scale=True,
-                                                  center=True,
                                                     epsilon=1e-05,
-                                                  beta_initializer=FFN_LN_beta_init if self.load_init else "zeros",
                                                   gamma_initializer=FFN_LN_gamma_init if self.load_init else "ones")
         self.FFN_dense_wide = kl.Dense(self.ffn_channels*self.ffn_widening,
                                        activation='linear',
                                        kernel_initializer=FFN_kernel1_init if self.load_init else 'lecun_normal',
                                        bias_initializer=FFN_bias1_init if self.load_init else 'lecun_normal',
                                        use_bias=True)
-        self.dropout = kl.Dropout(rate=self.ffn_dropout,**kwargs) # default 0.40 
+        self.dropout = kl.Dropout(rate=self.ffn_dropout,**kwargs) # default 0.40
         self.relu = kl.ReLU()
         self.FFN_dense_narrow = kl.Dense(self.ffn_channels,
                                          activation='linear',
@@ -228,13 +226,15 @@ class Performer(kl.Layer):
                  kernel_transformation: str = 'relu_kernel_transformation',
                  use_rot_emb: bool = True,
                  LN_gamma_init = None,
-                 LN_beta_init= None,
-                 q_init=None,
-                 k_init=None,
-                 v_init=None,
-                 att_output=None,
+                 q_init_k=None,
+                 k_init_k=None,
+                 v_init_k=None,
+                 att_output_k=None,
+                 q_init_b=None,
+                 k_init_b=None,
+                 v_init_b=None,
+                 att_output_b=None,
                  FFN_LN_gamma_init=None,
-                 FFN_LN_beta_init=None,
                  FFN_kernel1_init=None,
                  FFN_bias1_init=None,
                  FFN_kernel2_init=None,
@@ -270,7 +270,6 @@ class Performer(kl.Layer):
         self.seed=seed
         self.load_init=load_init
         self.FFN_LN_gamma_init=None,
-        self.FFN_LN_beta_init=FFN_LN_beta_init
         self.FFN_kernel1_init=FFN_kernel1_init
         self.FFN_bias1_init=FFN_bias1_init
         self.FFN_kernel2_init=FFN_kernel2_init
@@ -278,14 +277,10 @@ class Performer(kl.Layer):
 
         self.layer_norm = kl.LayerNormalization(axis=-1,
                                                   scale=True,
-                                                  center=True,
-                                                    epsilon=1.0e-05,
-                                                  beta_initializer="zeros",
-                                                  gamma_initializer="ones")
+                                                  epsilon=1.0e-05,
+                                                  gamma_initializer=LN_gamma_init if LN_gamma_init is self.load_init else "ones")
 
-
-
-        self.self_attention = fa_rpe.Attention(hidden_size=self.d_model,
+        self.self_attention = fa_rpe.Attention(hidden_size=self.d_model*2,
                                                num_heads=self.num_heads,
                                                nb_random_features=self.nb_random_features,
                                                use_rot_emb=self.use_rot_emb,
@@ -293,17 +288,20 @@ class Performer(kl.Layer):
                                                kernel_transformation=self.kernel_transformation,
                                                numerical_stabilizer=self.numerical_stabilizer,
                                                seed=self.seed,
-                                               q_init=q_init,
-                                               k_init=k_init,
-                                               v_init=v_init,
-                                               att_output=att_output,
+                                               q_init_k=q_init_k,
+                                               k_init_k=k_init_k,
+                                               v_init_k=v_init_k,
+                                               q_init_b=q_init_b,
+                                               k_init_b=k_init_b,
+                                               v_init_b=v_init_b,
+                                               att_output_k=att_output_k,
+                                               att_output_b=att_output_b,
                                                load_init = self.load_init,
                                                **kwargs)
         self.dropout = kl.Dropout(rate=self.dropout_rate,**kwargs)
         self.FFN = FFN(num_channels=self.hidden_size,
                        dropout_rate=self.dropout_rate,
                        FFN_LN_gamma_init=FFN_LN_gamma_init,
-                       FFN_LN_beta_init=FFN_LN_beta_init,
                        FFN_kernel1_init=FFN_kernel1_init,
                        FFN_bias1_init=FFN_bias1_init,
                        FFN_kernel2_init=FFN_kernel2_init,
@@ -326,7 +324,6 @@ class Performer(kl.Layer):
             "seed":self.seed,
             "load_init": self.load_init,
             "FFN_LN_gamma_init":self.FFN_LN_gamma_init,
-            "FFN_LN_beta_init":self.FFN_LN_beta_init,
             "FFN_kernel1_init":self.FFN_kernel1_init,
             "FFN_bias1_init":self.FFN_bias1_init,
             "FFN_kernel2_init":self.FFN_kernel2_init,
@@ -342,9 +339,9 @@ class Performer(kl.Layer):
     def call(self, inputs, rpe=None, training=None, **kwargs):
         x = self.layer_norm(inputs)
         x, k_prime, q_prime = self.self_attention(tf.cast(x,dtype=tf.float32),
-                                                tf.cast(x,dtype=tf.float32),
-                                                rpe=tf.cast(rpe,dtype=tf.float32),
-                                                **kwargs)
+                                                  tf.cast(x,dtype=tf.float32),
+                                                  rpe=tf.cast(rpe,dtype=tf.float32),
+                                                  **kwargs)
 
         x = self.dropout(x, training=training) ## 0.40
 
@@ -415,20 +412,22 @@ class Performer_Encoder(kl.Layer):
                                  num_heads=self.num_heads, # 8 
                                  dropout_rate=self.dropout_rate, # 
                                  numerical_stabilizer=self.numerical_stabilizer, # 1.0e-03
-                                 nb_random_features=self.nb_random_features, # ignore 
+                                 nb_random_features=self.nb_random_features, # ignored with relu kernel
                                  max_seq_length=self.max_seq_length, # 8192 
                                  kernel_transformation=self.kernel_transformation, # relu 
                                  seed=self.seed, # use whatever 
                                  use_rot_emb=self.use_rot_emb, # True
                                  load_init=self.load_init,
                                  LN_gamma_init = inits["LN_g" + str(i)] if self.load_init else None,
-                                 LN_beta_init=  inits["LN_b" + str(i)] if self.load_init else None,
-                                 q_init= inits["SA_q" + str(i)] if self.load_init else None,
-                                 k_init= inits["SA_k" + str(i)] if self.load_init else None,
-                                 v_init= inits["SA_v" + str(i)] if self.load_init else None,
-                                 att_output= inits["SA_O" + str(i)] if self.load_init else None,
+                                 q_init_k= inits["SA_q_k" + str(i)] if self.load_init else None,
+                                 k_init_k= inits["SA_k_k" + str(i)] if self.load_init else None,
+                                 v_init_k= inits["SA_v_k" + str(i)] if self.load_init else None,
+                                 q_init_b= inits["SA_q_b" + str(i)] if self.load_init else None,
+                                 k_init_b= inits["SA_k_b" + str(i)] if self.load_init else None,
+                                 v_init_b= inits["SA_v_b" + str(i)] if self.load_init else None,
+                                 att_output_k= inits["SA_O_k" + str(i)] if self.load_init else None,
+                                 att_output_b= inits["SA_O_b" + str(i)] if self.load_init else None,
                                  FFN_LN_gamma_init= inits["FFN_LN_g" + str(i)] if self.load_init else None,
-                                 FFN_LN_beta_init= inits["FFN_LN_b" + str(i)] if self.load_init else None,
                                  FFN_kernel1_init= inits["FFN_wide_k" + str(i)] if self.load_init else None,
                                  FFN_bias1_init= inits["FFN_wide_b" + str(i)] if self.load_init else None,
                                  FFN_kernel2_init= inits["FFN_narr_k" + str(i)] if self.load_init else None,
@@ -437,21 +436,12 @@ class Performer_Encoder(kl.Layer):
 
 
         self.layer_norm = kl.LayerNormalization(axis=-1,
-                                                  scale=True,
-                                                  center=True,
-                                                    epsilon=1.0e-05,
-                                                  beta_initializer=self.inits["performer_encoder_LN_b"] if self.load_init else "zeros",
-                                                  gamma_initializer=self.inits["performer_encoder_LN_g"] if self.load_init else "ones")
-
-    def build(self, input_shape):
-        N = input_shape[0]
-        L = input_shape[1]
-
-        #if self.use_rot_emb:
-        self.pos_emb = FixedPositionalEmbedding(self.d_model, self.max_seq_length)
-        self.layer_pos_emb = FixedPositionalEmbedding(self.dim, self.max_seq_length)
-
-        super(Performer_Encoder,self).build(input_shape)
+                                                scale=True,
+                                                epsilon=1.0e-05,
+                                                gamma_initializer=self.inits["performer_encoder_LN_g"] if self.load_init else "ones")
+        
+        self.sin_rpe,self.cos_rpe = generate_fixed_pos_embedding(self.dim, self.max_seq_length)
+        self.rpe = self.sin_rpe,self.cos_rpe
 
     def get_config(self):
         config = {
@@ -481,37 +471,35 @@ class Performer_Encoder(kl.Layer):
         att_matrices={}
         x = tf.cast(x, dtype=tf.float32)
         for idx,layer in enumerate(self.layers):
-            x += self.pos_emb(x) # c/w with lucid rains implementation
-            rpe = self.layer_pos_emb(x) ### check whether fixedpositionalembedding is c/w 
-                                        ### apply_rotary_embedding + fixedposembedding in flaxformer
-            x,k_prime,q_prime = layer(x, rpe=rpe, training=training)
+            x,k_prime,q_prime = layer(x, rpe=self.rpe, training=training)
             att_matrices['layer_' + str(idx)] = (k_prime,q_prime)
             ## relu, 256 hidden dimensions
-
         if self.norm:
             x = self.layer_norm(x)
         x = tf.cast(x, dtype=tf.bfloat16)
         return x,att_matrices
 
+def generate_fixed_pos_embedding(length, features, min_timescale=1.0, max_timescale=10000.0):
+    min_timescale = 1.0
+    max_timescale = 10000.0
+    fraction = tf.range(start=0, limit=features, delta=2, dtype='float32') / tf.cast(features, 'float32')
+    
+    # Calculate the geometric progression of timescales
+    timescale = min_timescale * (max_timescale / min_timescale) ** fraction
+    
+    # Calculate the inverse of these timescales to use as frequencies
+    inv_freq = 1. / timescale
+    
+    # Prepare the position encoding matrix
+    position = tf.range(start=0, limit=length, delta=1, dtype='float32')
+    sinusoid_inp = tf.einsum("i,j -> i j", position, inv_freq)
 
+    # Apply sin and cos to the scaled times, and then concatenate to get the final embeddings.
+    sinusoid_inp = tf.concat([sinusoid_inp, sinusoid_inp], axis=-1)
+    output_sin = tf.sin(sinusoid_inp)
+    output_cos = tf.cos(sinusoid_inp)
 
-@tf.keras.utils.register_keras_serializable()
-class FixedPositionalEmbedding(tf.keras.layers.Layer):
-    def __init__(self, dim, max_seq_len):
-        super().__init__()
-        self.dim = dim
-        self.max_seq_len = max_seq_len
-
-    def build(self, input_shape):
-        self.inv_freq = 1. / (10000 ** (tf.range(start=0, limit=self.dim, delta=2, dtype='float32') / self.dim))
-        self.position = tf.range(start=0, limit=self.max_seq_len, delta=1, dtype='float32')
-        self.sinusoid_inp = tf.einsum("i,j->ij", self.position, self.inv_freq)
-        self.emb = tf.concat((tf.math.sin(self.sinusoid_inp),
-                              tf.math.cos(self.sinusoid_inp)), axis=-1)
-
-    def call(self, x):
-        return tf.cast(self.emb[None, :x.shape[1], :],
-                       dtype=tf.float32)
+    return output_sin, output_cos
 
 @tf.keras.utils.register_keras_serializable()
 class TargetLengthCrop1D(kl.Layer):

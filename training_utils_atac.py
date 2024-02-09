@@ -390,13 +390,13 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
     # in case we want to run ablation without these inputs
     if not use_atac:
         print('not using atac')
-        masked_atac = tf.random.stateless_uniform(shape=[output_length_ATAC, 1], minval=0, maxval=150, 
+        masked_atac = tf.random.stateless_uniform(shape=[output_length_ATAC, 1], minval=0, maxval=150,
                                                       seed=[randomish_seed+1,randomish_seed+3],
                                                       dtype=tf.float32)
 
     if not use_seq:
         print('not using sequence')
-        random_sequence = tf.random.stateless_uniform(shape=[input_length], minval=0, maxval=4, 
+        random_sequence = tf.random.stateless_uniform(shape=[input_length], minval=0, maxval=4,
                                                       seed=[randomish_seed+21,randomish_seed+2],
                                                       dtype=tf.int32)
         random_one_hot = tf.one_hot(random_sequence, depth=4)
@@ -609,7 +609,6 @@ def parse_args(parser):
     parser.add_argument('--loss_type', type=str, default="poisson_multinomial", help= 'loss_type')
     parser.add_argument('--total_weight_loss',type=str, default="0.15", help= 'total_weight_loss')
     parser.add_argument('--use_rot_emb',type=str, default="True", help= 'use_rot_emb')
-    parser.add_argument('--best_val_loss', type=float, default=0.09113)
     parser.add_argument('--run_id', type=str, default=None)
     parser.add_argument('--warmup_frac', type=float, default=1.0)
     parser.add_argument('--num_epochs', type=int, default=100)
@@ -618,7 +617,6 @@ def parse_args(parser):
     parser.add_argument('--unmask_loss',type=str, default="False", help= 'return_constant_lr')
     args = parser.parse_args()
     return parser
-
 
 def one_hot(sequence):
     '''

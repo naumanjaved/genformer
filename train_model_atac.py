@@ -101,7 +101,6 @@ def main():
             'loss_type':  str(args.loss_type),
             'total_weight_loss':  float(args.total_weight_loss),
             'use_rot_emb': parse_bool_str(args.use_rot_emb),
-            'best_val_loss': float(args.best_val_loss),
             'checkpoint_path': args.checkpoint_path,
             'tpu': args.tpu_name,
             'gcs_path': args.gcs_path,
@@ -180,12 +179,12 @@ def main():
                                 output_length=wandb.config.output_length,
                                 final_output_length=wandb.config.final_output_length,
                                 num_heads=wandb.config.num_heads,
-                                numerical_stabilizer=0.001,
+                                numerical_stabilizer=0.0000001,
                                 max_seq_length=wandb.config.output_length,
                                 norm=True,
                                 BN_momentum=wandb.config.BN_momentum,
                                 normalize = True,
-                                seed = wandb.config.seed,
+                                seed = wandb.config.val_data_seed,
                                 num_transformer_layers=wandb.config.num_transformer_layers,
                                 final_point_scale=wandb.config.final_point_scale,
                                 filter_list_seq=wandb.config.filter_list_seq,
@@ -198,18 +197,19 @@ def main():
         init_learning_rate=1.0e-06
         optimizer = tf.keras.optimizers.Adam(learning_rate=init_learning_rate,
                                                 epsilon=wandb.config.epsilon,
-                                                weight_decay=1.0e-03,
+                                                #weight_decay=1.0e-03,
                                                 global_clipnorm=wandb.config.gradient_clip)
         optimizer.exclude_from_weight_decay(var_names = ['bias', 'batch_norm','layer_norm',
-                                                         'conv1d', 'pool',
                                                         'BN', 'LN', 'LayerNorm','BatchNorm'])
         metric_dict = {} # initialize dictionary to store metrics
 
         batch_num = tf.Variable(0, name="batch_num")
         optimizer_step_track = tf.Variable(0, name="optimizer_step_track")
+        best_val_loss = tf.Variable(1000.0, name="best_val_loss")
         ckpt = tf.train.Checkpoint(batch_num=batch_num,
                                     optimizer=optimizer,
                                     model=model,
+                                    best_val_loss=best_val_loss,
                                     optimizer_step_track=optimizer_step_track)
         
         checkpoint_dir = os.path.join(wandb.config.model_save_dir, wandb.run.name)
@@ -236,7 +236,7 @@ def main():
 
         val_losses = []
         if wandb.config.load_init: # if loading pretrained model, initialize the best val loss from previous run
-            val_losses.append(wandb.config.best_val_loss)
+            val_losses.append(best_val_loss.numpy())
         patience_counter = 0 # simple patience counter for early stopping
         stop_criteria = False
         best_epoch = 0 # track epoch with best validation loss 
@@ -330,6 +330,9 @@ def main():
 
             duration = (time.time() - start) / 60.
             print('completed epoch ' + str(epoch_idx + 1 + wandb.config.num_epochs_to_start) + ' validation - duration(mins): ' + str(duration))
+
+            if val_loss < min(val_losses[:-1]):
+                best_val_loss.assign(val_loss)
 
             # Start early stopping checks:
             # - After epoch one if not loading from a checkpoint
