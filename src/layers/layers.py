@@ -288,6 +288,7 @@ class Performer(kl.Layer):
                                                normalize=self.normalize,
                                                kernel_transformation=self.kernel_transformation,
                                                numerical_stabilizer=self.numerical_stabilizer,
+                                               nb_random_features=256,
                                                seed=self.seed,
                                                q_init=q_init,
                                                k_init=k_init,
@@ -412,7 +413,6 @@ class Performer_Encoder(kl.Layer):
                                  kernel_transformation=self.kernel_transformation, # relu
                                  seed=self.seed, # use whatever
                                  use_rot_emb=self.use_rot_emb, # True
-                                 nb_random_features=256,
                                  load_init=self.load_init,
                                  LN_gamma_init = inits["LN_g" + str(i)] if self.load_init else None,
                                  LN_beta_init=  inits["LN_b" + str(i)] if self.load_init else None,
