@@ -238,7 +238,7 @@ class genformer(tf.keras.Model):
 
         transformer_input = tf.concat([sequence,atac_x, motif_activity],
                                       axis=2) # append processed seq,atac,motif inputs in channel dim.
-        transformer_input = self.pre_transformer_projection(transformer_input)
+        #transformer_input = self.pre_transformer_projection(transformer_input)
         out_performer,att_matrices = self.performer(transformer_input, training=training)
         
         out = self.final_pointwise_conv(out_performer, training=training) ##
