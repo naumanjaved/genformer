@@ -30,7 +30,7 @@ class genformer(tf.keras.Model):
                  filter_list_atac: list = [32, 64],
                  final_point_scale: int = 6,
                  num_motifs: int = 693,
-                 motif_dropout_rate: float = 0.15,
+                 motif_dropout_rate: float = 0.25,
                  motif_units_fc: int = 32,
                  name: str = 'genformer',
                  **kwargs):
@@ -92,8 +92,8 @@ class genformer(tf.keras.Model):
         self.motif_units_fc = motif_units_fc
         self.motif_dropout_rate= motif_dropout_rate
 
-        self.hidden_size=self.filter_list_seq[-1] #+ self.filter_list_atac[-1] + (self.motif_units_fc//4)
-        self.d_model = self.filter_list_seq[-1] #+ self.filter_list_atac[-1] + (self.motif_units_fc//4)
+        self.hidden_size=self.filter_list_seq[-1] + self.filter_list_atac[-1] + (self.motif_units_fc//4)
+        self.d_model = self.filter_list_seq[-1] + self.filter_list_atac[-1] + (self.motif_units_fc//4)
 
         self.dim = self.hidden_size  // self.num_heads
 
@@ -167,10 +167,10 @@ class genformer(tf.keras.Model):
             bias_initializer='zeros',
             use_bias=True)
         
-        self.pre_transformer_projection = kl.Dense(self.hidden_size,
-                                                   activation=None,
-                                                    kernel_initializer='lecun_normal',
-                                                    use_bias=False)
+        #self.pre_transformer_projection = kl.Dense(self.hidden_size,
+        #                                           activation=None,
+        #                                            kernel_initializer='lecun_normal',
+        #                                            use_bias=False)
         
         # Performer attention
         self.performer = Performer_Encoder(
@@ -245,7 +245,7 @@ class genformer(tf.keras.Model):
         out = self.dropout(out, training=training) ## 0.05 default in tom's implementation
         out = self.gelu(out)
         out = self.final_dense_profile(out, training=training)
-        out = self.crop_final(out) ## tom crops only on loss, tom will try cropping less 
+        out = self.crop_final(out) ## tom crops only on loss, tom will try cropping less
 
         return out
 

@@ -26,10 +26,10 @@ python3 train_model_atac.py \
             --min_delta=0.0000005 \
             --model_save_dir="gs://genformer_europe_west_copy/atac_pretrain/models" \
             --epsilon=1.0e-8 \
-            --num_transformer_layers="10" \
+            --num_transformer_layers="9" \
             --dropout_rate="0.20" \
             --pointwise_dropout_rate="0.10" \
-            --num_heads="8" \
+            --num_heads="4" \
             --kernel_transformation="relu_kernel_transformation" \
             --savefreq=1 \
             --rectify="True" \

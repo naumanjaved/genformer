@@ -186,10 +186,6 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
     atac = tf.cast(tf.ensure_shape(tf.io.parse_tensor(data['atac'], out_type=tf.float16), 
                                    [output_length_ATAC,1]),dtype=tf.float32)
     atac_target = atac ## store the target ATAC, as we will subsequently directly manipulate atac for masking
-    noise = tf.math.abs(tf.random.normal(atac.shape, mean=0.0, stddev=1.0e-04, dtype=tf.float32))
-    mask = tf.math.not_equal(atac, 0)
-    mask = tf.cast(mask, dtype=tf.float32)
-    atac = atac + mask * noise
 
     #atac = atac + tf.math.abs(g.normal(atac.shape,mean=1.0e-05,stddev=1.0e-05,dtype=tf.float32))
     # get peaks centers 
@@ -318,10 +314,6 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
     atac = tf.ensure_shape(tf.io.parse_tensor(data['atac'], out_type=tf.float16), [output_length_ATAC,1])
     atac = tf.cast(atac,dtype=tf.float32)
     atac_target = atac ## store the target ATAC, as we will subsequently directly manipulate atac for masking
-    noise = tf.math.abs(tf.random.normal(atac.shape, mean=0.0, stddev=1.0e-04, dtype=tf.float32))
-    mask = tf.math.not_equal(atac, 0)
-    mask = tf.cast(mask, dtype=tf.float32)
-    atac = atac + mask * noise
 
     # set up a semi-random seem based on the number of
     # peaks and atac signal in the window

@@ -367,12 +367,12 @@ class Attention(tf.keras.layers.Layer):
                  num_heads,
                  kernel_transformation=relu_kernel_transformation,
                  numerical_stabilizer=0.001,
-                  causal=False,
-                  nb_random_features=256,
-                  use_rot_emb = True,
-                  eps = 1e-6,
-                  normalize = True,
-                  seed=42,
+                   causal=False,
+                   nb_random_features=256,
+                   use_rot_emb = True,
+                   eps = 1e-6,
+                   normalize = True,
+                   seed=42,
                  q_init=None,
                  k_init=None,
                  v_init=None,
@@ -434,17 +434,17 @@ class Attention(tf.keras.layers.Layer):
         self.query_dense_layer = util.DenseEinsum(
             output_shape=(self.num_heads, size_per_head),
             kernel_initializer=self.q_init if self.load_init else attention_initializer,
-            use_bias=True,
+            use_bias=False,
             name="query")
         self.key_dense_layer = util.DenseEinsum(
             output_shape=(self.num_heads, size_per_head),
             kernel_initializer=self.k_init if self.load_init else attention_initializer,
-            use_bias=True,
+            use_bias=False,
             name="key")
         self.value_dense_layer = util.DenseEinsum(
             output_shape=(self.num_heads, size_per_head),
             kernel_initializer=self.v_init if self.load_init else attention_initializer,
-            use_bias=True,
+            use_bias=False,
             name="value")
 
         output_initializer = _glorot_initializer(self.hidden_size, self.hidden_size)

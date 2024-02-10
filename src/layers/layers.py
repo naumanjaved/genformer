@@ -14,8 +14,8 @@ import src.utils as utils
 from tensorflow.keras import regularizers
 from tensorflow.keras.layers.experimental import SyncBatchNormalization as syncbatchnorm
 
-def custom_constant_initializer(shape, dtype=None):
-    return tf.constant(2.0, shape=shape, dtype=dtype)
+#def custom_constant_initializer(shape, dtype=None):
+#    return tf.constant(2.0, shape=shape, dtype=dtype)
 
 @tf.keras.utils.register_keras_serializable()
 class SoftmaxPooling1D(kl.Layer):
@@ -28,13 +28,13 @@ class SoftmaxPooling1D(kl.Layer):
         self.dense = kl.Dense(
             units = 1,
             use_bias=False,
-            kernel_initializer=custom_constant_initializer)
+            kernel_initializer='lecun_normal')
 
     def call(self, inputs, **kwargs):
         _, length, num_features = inputs.shape
         # Reshape input for pooling
         inputs = tf.reshape(inputs, [-1, length//self.pool_size,
-                                              self.pool_size, num_features])
+                                     self.pool_size, num_features])
 
         dense_out = self.dense(inputs)
         # Compute softmax weights
@@ -412,6 +412,7 @@ class Performer_Encoder(kl.Layer):
                                  kernel_transformation=self.kernel_transformation, # relu
                                  seed=self.seed, # use whatever
                                  use_rot_emb=self.use_rot_emb, # True
+                                 nb_random_features=256,
                                  load_init=self.load_init,
                                  LN_gamma_init = inits["LN_g" + str(i)] if self.load_init else None,
                                  LN_beta_init=  inits["LN_b" + str(i)] if self.load_init else None,
