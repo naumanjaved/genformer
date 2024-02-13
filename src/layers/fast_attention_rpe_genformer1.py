@@ -120,7 +120,7 @@ def relu_kernel_transformation(data,
     #    return tf.nn.relu(data) + numerical_stabilizer
     #else:
     ratio = 1.0 / tf.math.sqrt(
-    tf.dtypes.cast(projection_matrix.shape[0], tf.float32))
+    tf.dtypes.cast(projection_matrix.shape[0], data.dtype))
     projection_matrix = tf.cast(projection_matrix, dtype=data.dtype)
     data_dash = ratio * tf.einsum("blhd,md->blhm", data, projection_matrix)
     return tf.nn.relu(data_dash) + numerical_stabilizer
@@ -219,7 +219,7 @@ def noncausal_denominator(qs, ks):
   Returns:
     FAVOR normalizer in noncausal attention.
     """
-    all_ones = tf.ones([ks.shape[0]], dtype=tf.float32)
+    all_ones = tf.ones([ks.shape[0]], dtype=tf.bfloat16)
     ks_sum = tf.einsum("lbhm,l->bhm", ks, all_ones)
     return tf.einsum("lbhm,bhm->lbh", qs, ks_sum)
 
