@@ -621,7 +621,7 @@ def parse_args(parser):
     parser.add_argument('--num_epochs', type=int, default=100)
     parser.add_argument('--reset_optimizer_state',type=str, default="False", help= 'reset_optimizer_state')
     parser.add_argument('--return_constant_lr',type=str, default="False", help= 'return_constant_lr')
-    parser.add_argument('--atac_scale',type=float, default=0.10, help= 'atac_scale')
+    parser.add_argument('--unmask_loss',type=str, default="False", help= 'unmask_loss')
     args = parser.parse_args()
     return parser
 
