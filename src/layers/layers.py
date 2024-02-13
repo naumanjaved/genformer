@@ -497,7 +497,8 @@ class FixedPositionalEmbedding(tf.keras.layers.Layer):
         self.emb = tf.concat((tf.math.sin(self.sinusoid_inp),
                               tf.math.cos(self.sinusoid_inp)), axis=-1)
     def call(self, x):
-        return self.emb[None, :x.shape[1], :]
+        return tf.cast(self.emb[None, :x.shape[1], :],
+                       dtype=tf.bfloat16)
 
 @tf.keras.utils.register_keras_serializable()
 class TargetLengthCrop1D(kl.Layer):

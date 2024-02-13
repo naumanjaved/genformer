@@ -121,6 +121,7 @@ def relu_kernel_transformation(data,
     #else:
     ratio = 1.0 / tf.math.sqrt(
     tf.dtypes.cast(projection_matrix.shape[0], tf.float32))
+    projection_matrix = tf.cast(projection_matrix, dtype=data.dtype)
     data_dash = ratio * tf.einsum("blhd,md->blhm", data, projection_matrix)
     return tf.nn.relu(data_dash) + numerical_stabilizer
 

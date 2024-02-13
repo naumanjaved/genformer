@@ -53,5 +53,5 @@ python3 train_model_atac.py \
             --val_data_seed=19 \
             --loss_type="poisson_multinomial" \
             --model_save_basename="genformer_multinomial" \
-            --warmup_frac=1.0 \
-            --decay_steps=850525
+            --warmup_frac=0.33 \
+            --decay_steps=1701050
