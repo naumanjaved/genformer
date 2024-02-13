@@ -512,9 +512,9 @@ class Attention(tf.keras.layers.Layer):
         b, n, _ = query_input.shape
         h = self.num_heads
 
-        q = tf.cast(self.query_dense_layer(query_input),dtype=tf.float32)
-        k = tf.cast(self.key_dense_layer(source_input),dtype=tf.float32)
-        v = tf.cast(self.value_dense_layer(source_input),dtype=tf.float32)
+        q = self.query_dense_layer(query_input)
+        k = self.key_dense_layer(source_input)
+        v = self.value_dense_layer(source_input)
 
         if self.kernel_transformation == 'relu_kernel_transformation':
             kernel_transform = relu_kernel_transformation

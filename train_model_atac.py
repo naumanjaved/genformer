@@ -295,7 +295,7 @@ def main():
 
             optimizer_step_track.assign(current_optimizer_step)
             print('lr at:' + str(optimizer.lr.values[0]))
-            train_loss = metric_dict['train_loss'].result().numpy() #this is the per example loss * NUM_REPLICAS # multiply by NUM_REPLICAS to get total loss
+            train_loss = metric_dict['train_loss'].result().numpy() * NUM_REPLICAS #this is the per example loss * NUM_REPLICAS # multiply by NUM_REPLICAS to get total loss
             print('train_loss: ' + str(train_loss))
 
             wandb.log({'train_loss': train_loss},
@@ -314,7 +314,7 @@ def main():
             for k in range(wandb.config.val_steps_ho):
                 strategy.run(val_step, args=(next(data_val_ho),))
 
-            val_loss = metric_dict['val_loss'].result().numpy() #this is the per example loss # multiply by NUM_REPLICAS to get total loss 
+            val_loss = metric_dict['val_loss'].result().numpy() * NUM_REPLICAS #this is the per example loss # multiply by NUM_REPLICAS to get total loss 
             print('val_loss: ' + str(val_loss))
 
             val_losses.append(val_loss)

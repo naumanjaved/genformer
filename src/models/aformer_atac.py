@@ -19,14 +19,14 @@ class genformer(tf.keras.Model):
                  final_output_length: int = 4092,
                  num_heads:int = 4,
                  numerical_stabilizer: float =0.001,
-                 num_transformer_layers:int = 7,
+                 num_transformer_layers:int = 8,
                  norm=True,
                  max_seq_length:int = 1536,
                  BN_momentum: float = 0.90,
                  use_rot_emb: bool =True,
                  normalize: bool = True,
                  seed: int = 3,
-                 filter_list_seq: list = [768, 896, 1024, 1024, 1152, 1280],
+                 filter_list_seq: list = [512, 640, 768, 896, 1024, 1152],
                  filter_list_atac: list = [32, 64],
                  final_point_scale: int = 6,
                  num_motifs: int = 693,
@@ -92,8 +92,8 @@ class genformer(tf.keras.Model):
         self.motif_units_fc = motif_units_fc
         self.motif_dropout_rate= motif_dropout_rate
 
-        self.hidden_size=self.filter_list_seq[-1] + self.filter_list_atac[-1] + (self.motif_units_fc//4)
-        self.d_model = self.filter_list_seq[-1] + self.filter_list_atac[-1] + (self.motif_units_fc//4)
+        self.hidden_size=self.filter_list_seq[-1]# + self.filter_list_atac[-1] + (self.motif_units_fc//4)
+        self.d_model = self.filter_list_seq[-1]# + self.filter_list_atac[-1] + (self.motif_units_fc//4)
 
         self.dim = self.hidden_size  // self.num_heads
 
@@ -167,10 +167,10 @@ class genformer(tf.keras.Model):
             bias_initializer='zeros',
             use_bias=True)
         
-        #self.pre_transformer_projection = kl.Dense(self.hidden_size,
-        #                                           activation=None,
-        #                                            kernel_initializer='lecun_normal',
-        #                                            use_bias=False)
+        self.pre_transformer_projection = kl.Dense(self.hidden_size,
+                                                   activation=None,
+                                                    kernel_initializer='lecun_normal',
+                                                    use_bias=False)
         
         # Performer attention
         self.performer = Performer_Encoder(
@@ -238,7 +238,7 @@ class genformer(tf.keras.Model):
 
         transformer_input = tf.concat([sequence,atac_x, motif_activity],
                                       axis=2) # append processed seq,atac,motif inputs in channel dim.
-        #transformer_input = self.pre_transformer_projection(transformer_input)
+        transformer_input = self.pre_transformer_projection(transformer_input)
         out_performer,att_matrices = self.performer(transformer_input, training=training)
         
         out = self.final_pointwise_conv(out_performer, training=training) ##
@@ -308,7 +308,10 @@ class genformer(tf.keras.Model):
         motif_activity = tf.tile(motif_activity, [1, self.output_length, 1])
 
         transformer_input = tf.concat([sequence,atac_x, motif_activity], axis=2) # append processed seq,atac,motif inputs in channel dim.
+        transformer_input = self.pre_transformer_projection(transformer_input)
         out_performer,att_matrices = self.performer(transformer_input, training=training)
+
+
         out = self.final_pointwise_conv(out_performer, training=training)
         out = self.dropout(out, training=training)
         out = self.gelu(out)
