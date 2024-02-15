@@ -206,11 +206,15 @@ def main():
         batch_num = tf.Variable(0, name="batch_num")
         optimizer_step_track = tf.Variable(0, name="optimizer_step_track")
         best_val_loss = tf.Variable(1000.0, name="best_val_loss")
+        step_to_start = tf.Variable(0, name="step_to_start")
         ckpt = tf.train.Checkpoint(batch_num=batch_num,
                                     optimizer=optimizer,
                                     model=model,
                                     best_val_loss=best_val_loss,
+                                    step_to_start=step_to_start,
                                     optimizer_step_track=optimizer_step_track)
+        if args.step_to_start is not None:
+            step_to_start.assign(args.step_to_start)
         
         checkpoint_dir = os.path.join(wandb.config.model_save_dir, wandb.run.name)
         if wandb.config.load_init:
@@ -260,11 +264,11 @@ def main():
 
         local_epoch = 0
         print(wandb.config)
-        
         for epoch_idx in range(wandb.config.num_epochs):
             #epoch_i = (epoch_idx + wandb.config.num_epochs_to_start) % len(train_human_its_mult)
-            step_num = (wandb.config.num_epochs_to_start + epoch_idx) * \
-                            wandb.config.train_steps * GLOBAL_BATCH_SIZE
+            #step_num = ((wandb.config.num_epochs_to_start + epoch_idx) * \
+            #                wandb.config.train_steps * GLOBAL_BATCH_SIZE)
+            step_num = step_to_start.numpy()
             if (epoch_idx == 0):
                 if wandb.config.load_init:
                     if not wandb.config.reset_optimizer_state:
@@ -305,6 +309,8 @@ def main():
                         step=step_num)
             duration = (time.time() - start) / 60.
             print('completed epoch ' + str(1 + wandb.config.num_epochs_to_start + epoch_idx) + ' - duration(mins): ' + str(duration))
+
+            step_to_start.assign_add(wandb.config.train_steps * GLOBAL_BATCH_SIZE)
 
             # main validation step:
             # - run the validation loop
