@@ -147,11 +147,11 @@ def main():
         GLOBAL_BATCH_SIZE = BATCH_SIZE_PER_REPLICA*NUM_REPLICAS # num total examples per step across all replicas
         print('global batch size:', GLOBAL_BATCH_SIZE)
 
-        wandb.config.update({"train_steps": 1 + (34021 * 32 // (GLOBAL_BATCH_SIZE))},
+        wandb.config.update({"train_steps": 1 + (34021 * 16 // (GLOBAL_BATCH_SIZE))},
                             allow_val_change=True)
         wandb.config.update({"val_steps_ho" : wandb.config.val_examples_ho // GLOBAL_BATCH_SIZE},
                             allow_val_change=True)
-        wandb.config.update({"total_steps": 1 + (34021 * 32 // GLOBAL_BATCH_SIZE)},
+        wandb.config.update({"total_steps": 1 + (34021 * 16 // GLOBAL_BATCH_SIZE)},
                             allow_val_change=True)
         # create the dataset iterators, one for training, one for holdout validation  
         train_human_it, data_val_ho = \
