@@ -619,7 +619,7 @@ def parse_args(parser):
     parser.add_argument('--total_weight_loss',type=str, default="0.15", help= 'total_weight_loss')
     parser.add_argument('--use_rot_emb',type=str, default="True", help= 'use_rot_emb')
     parser.add_argument('--run_id', type=str, default=None)
-    parser.add_argument('--warmup_frac', type=float, default=1.0)
+    parser.add_argument('--warmup_steps', type=float, default=5000)
     parser.add_argument('--num_epochs', type=int, default=100)
     parser.add_argument('--reset_optimizer_state',type=str, default="False", help= 'reset_optimizer_state')
     parser.add_argument('--return_constant_lr',type=str, default="False", help= 'return_constant_lr')

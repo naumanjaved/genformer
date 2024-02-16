@@ -115,7 +115,7 @@ def main():
             'max_shift': int(args.max_shift),
             'crop_size': (int(args.output_length) - int(args.final_output_length))//2,
             'reset_optimizer_state': parse_bool_str(args.reset_optimizer_state),
-            'warmup_fraction': float(args.warmup_frac),
+            'warmup_steps': float(args.warmup_steps),
             'return_constant_lr': parse_bool_str(args.return_constant_lr),
             'unmask_loss': parse_bool_str(args.unmask_loss)
     }
@@ -134,7 +134,7 @@ def main():
         # TFrecord dataset options
         options = tf.data.Options()
         options.experimental_distribute.auto_shard_policy=\
-            tf.data.experimental.AutoShardPolicy.DATA
+            tf.data.experimental.AutoShardPolicy.FILE
         options.deterministic=False
         options_val = tf.data.Options()
         options_val.experimental_distribute.auto_shard_policy=\
@@ -194,10 +194,10 @@ def main():
         print('initialized model')
 
         # initialize optimizer with warmup and cosine decay
-        init_learning_rate=1.0e-06
+        init_learning_rate=1.0e-07
         optimizer = tf.keras.optimizers.Adam(learning_rate=init_learning_rate,
                                                 epsilon=wandb.config.epsilon,
-                                                #weight_decay=1.0e-03,
+                                                weight_decay=1.0e-05,
                                                 global_clipnorm=wandb.config.gradient_clip)
         optimizer.exclude_from_weight_decay(var_names = ['bias', 'batch_norm','layer_norm',
                                                         'BN', 'LN', 'LayerNorm','BatchNorm'])
@@ -286,7 +286,7 @@ def main():
             for k in range(wandb.config.train_steps):
                 lr = schedulers.cos_w_warmup(current_optimizer_step,
                                              wandb.config.lr_base,
-                                             (wandb.config.warmup_fraction*wandb.config.total_steps),
+                                             wandb.config.warmup_steps,
                                              wandb.config.decay_steps,
                                              wandb.config.decay_frac,
                                              wandb.config.return_constant_lr)
