@@ -195,7 +195,7 @@ def main():
 
         # initialize optimizer with warmup and cosine decay
         init_learning_rate=1.0e-07
-        optimizer = tf.keras.optimizers.Adam(learning_rate=init_learning_rate,
+        optimizer = tf.keras.optimizers.AdamW(learning_rate=init_learning_rate,
                                                 epsilon=wandb.config.epsilon,
                                                 weight_decay=1.0e-05,
                                                 global_clipnorm=wandb.config.gradient_clip)

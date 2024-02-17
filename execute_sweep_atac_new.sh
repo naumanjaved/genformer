@@ -26,7 +26,7 @@ python3 train_model_atac.py \
             --min_delta=0.0000005 \
             --model_save_dir="gs://$3/atac_pretrain/models" \
             --epsilon=1.0e-8 \
-            --num_transformer_layers="9" \
+            --num_transformer_layers="10" \
             --dropout_rate="0.20" \
             --pointwise_dropout_rate="0.10" \
             --num_heads="8" \
@@ -47,9 +47,9 @@ python3 train_model_atac.py \
             --total_weight_loss="0.15" \
             --use_rot_emb="True" \
             --lr_base="2.5e-04" \
-            --decay_frac="1.0" \
+            --decay_frac="0.10" \
             --gradient_clip="1.0" \
-            --seed=1 \
+            --seed=5 \
             --val_data_seed=19 \
             --loss_type="poisson" \
             --model_save_basename="genformer" \
