@@ -117,7 +117,7 @@ def relu_kernel_transformation(data,
   """
     #del is_query
     #if projection_matrix is None:
-    #    return tf.nn.relu(data) + numerical_stabilizer
+    #  return tf.nn.relu(data) + numerical_stabilizer
     #else:
     ratio = 1.0 / tf.math.sqrt(
     tf.dtypes.cast(projection_matrix.shape[0], data.dtype))
@@ -519,12 +519,15 @@ class Attention(tf.keras.layers.Layer):
 
         if self.kernel_transformation == 'relu_kernel_transformation':
             kernel_transform = relu_kernel_transformation
+            projection_matrix=None
 
         elif self.kernel_transformation == 'relu_kernel_transformation_q':
             kernel_transform = relu_kernel_transformation_q
+            #projection_matrix=None
 
         else:
             kernel_transform = softmax_kernel_transformation
+            #projection_matrix=self.projection_matrix
 
         dim = q.shape[-1]
         tgt_len = k.shape[1]
