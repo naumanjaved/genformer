@@ -220,10 +220,10 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
                                                 atac_mask_dropout)
 
     ## scrambled input 
-    atac_scrambled = tf.reshape(tf.random.experimental.stateless_shuffle(tf.reshape(atac, [-1,512]),
-                                                              seed=[randomish_seed+34,randomish_seed+4]),
-                                                              [-1,1])
-    masked_atac = atac * full_comb_mask + atac_scrambled * (1.0-full_comb_mask) ## apply the mask to the input profile
+    #atac_scrambled = tf.reshape(tf.random.experimental.stateless_shuffle(tf.reshape(atac, [-1,512]),
+    #                                                          seed=[randomish_seed+34,randomish_seed+4]),
+    #                                                          [-1,1])
+    masked_atac = atac * full_comb_mask #+ atac_scrambled * (1.0-full_comb_mask) ## apply the mask to the input profile
 
     if log_atac:
         masked_atac = tf.math.log1p(masked_atac)
@@ -375,10 +375,10 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
                                                 1, # set atac_mask_int to 1 to prevent increased masking used in training
                                                 atac_mask_dropout)
 
-    atac_scrambled = tf.reshape(tf.random.experimental.stateless_shuffle(tf.reshape(atac, [-1,512]),
-                                                              seed=[randomish_seed+34,randomish_seed+4]),
-                                                              [-1,1])
-    masked_atac = atac * full_comb_mask + atac_scrambled * (1.0-full_comb_mask) ## apply the mask to the input profile
+    #atac_scrambled = tf.reshape(tf.random.experimental.stateless_shuffle(tf.reshape(atac, [-1,512]),
+    #                                                          seed=[randomish_seed+34,randomish_seed+4]),
+    #                                                          [-1,1])
+    masked_atac = atac * full_comb_mask #+ atac_scrambled * (1.0-full_comb_mask) ## apply the mask to the input profile
 
     if log_atac:
         masked_atac = tf.math.log1p(masked_atac)
