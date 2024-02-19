@@ -189,7 +189,7 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
     atac_target = atac ## store the target ATAC, as we will subsequently directly manipulate atac for masking
 
     #atac = atac + tf.math.abs(g.normal(atac.shape,mean=1.0e-05,stddev=1.0e-05,dtype=tf.float32))
-    # get peaks centers 
+    # get peaks centers
     peaks_center = tf.expand_dims(tf.io.parse_tensor(data['peaks_center'], out_type=tf.int32), 
                                   axis=1)
     peaks_c_crop = tf.slice(peaks_center, [crop_size,0], [output_length-2*crop_size,-1]) # crop at the outset 
