@@ -46,10 +46,10 @@ python3 train_model_atac.py \
             --use_motif_activity="True" \
             --total_weight_loss="0.15" \
             --use_rot_emb="True" \
-            --lr_base="2.5e-04" \
+            --lr_base="1.0e-04" \
             --decay_frac="0.10" \
             --gradient_clip="1.0" \
-            --seed=5 \
+            --seed=1 \
             --val_data_seed=19 \
             --loss_type="poisson" \
             --model_save_basename="genformer" \
