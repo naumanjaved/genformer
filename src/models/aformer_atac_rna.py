@@ -18,13 +18,10 @@ class genformer(tf.keras.Model):
                  final_output_length: int = 4092,
                  num_heads:int = 4,
                  numerical_stabilizer: float =0.001,
-                 nb_random_features:int = 256,
                  num_transformer_layers:int = 7,
                  norm=True,
                  max_seq_length:int = 1536,
                  BN_momentum: float = 0.90,
-                 load_init: bool=False,
-                 inits=None,
                  use_rot_emb: bool =True,
                  normalize: bool = True,
                  seed: int = 3,
@@ -32,9 +29,11 @@ class genformer(tf.keras.Model):
                  filter_list_atac: list = [32, 64],
                  final_point_scale: int = 6,
                  num_motifs: int = 693,
-                 motif_dropout_rate: float = 0.15,
+                 motif_dropout_rate: float = 0.25,
                  motif_units_fc: int = 32,
                  name: str = 'genformer',
+                 load_init: bool=False,
+                 inits=None,
                  **kwargs):
         """
         Genformer model takes as input sequence, masked ATAC seq, and TF 
@@ -53,7 +52,6 @@ class genformer(tf.keras.Model):
              - final_output_length: length of final output profile after cropping
              - num_heads: number of heads for Performer attention
              - numerical_stabilizer: numerical stabilizer for Performer attention
-             - nb_random_features: number of random features for Performer attention
              - num_transformer_layers: number of layers for Performer attention
              - norm: whether to use layer normalization in Performer attention
              - max_seq_length: maximum sequence length for Performer attention
@@ -79,7 +77,6 @@ class genformer(tf.keras.Model):
         self.num_heads = num_heads
         self.input_length = input_length
         self.numerical_stabilizer = numerical_stabilizer
-        self.nb_random_features = nb_random_features
         self.num_transformer_layers = num_transformer_layers
         self.output_length = output_length
         self.final_output_length = final_output_length
@@ -190,13 +187,19 @@ class genformer(tf.keras.Model):
             kernel_initializer=self.inits['tf_activity_fc1_k'] if (self.load_init) else 'lecun_normal',
             bias_initializer=self.inits['tf_activity_fc1_b'] if (self.load_init) else 'zeros',
             use_bias=True)
-
+        self.motif_dropout2=kl.Dropout( rate=self.motif_dropout_rate/4, **kwargs)
         self.motif_activity_fc2 = kl.Dense(
             self.motif_units_fc//4,
             activation=None,
             kernel_initializer=self.inits['tf_activity_fc2_k'] if (self.load_init) else 'lecun_normal',
             bias_initializer=self.inits['tf_activity_fc2_b'] if (self.load_init) else 'zeros',
             use_bias=True)
+        
+
+        self.pre_transformer_projection = kl.Dense(self.hidden_size,
+                                                   activation=None,
+                                                    kernel_initializer=self.inits['pre_transformer_projection'] if (self.load_init) else 'lecun_normal',
+                                                    use_bias=False)
 
         # Performer attention
         self.performer = Performer_Encoder(
@@ -206,7 +209,6 @@ class genformer(tf.keras.Model):
             d_model=self.d_model,
             norm=self.norm,
             max_seq_length=self.max_seq_length,
-            nb_random_features=self.nb_random_features,
             hidden_size=self.hidden_size,
             numerical_stabilizer=self.numerical_stabilizer,
             dropout_rate=self.dropout_rate,
@@ -224,13 +226,18 @@ class genformer(tf.keras.Model):
                                              target_length=self.final_output_length,
                                              name='target_input')
 
-        self.final_pointwise_conv = conv_block(filters=self.filter_list_seq[-1] // self.final_point_scale,
+        self.final_pointwise_conv_atac = conv_block(filters=self.filter_list_seq[-1] // self.final_point_scale,
                                                 beta_init=self.inits['final_point_BN_b'] if self.load_init else None,
                                                 gamma_init=self.inits['final_point_BN_g'] if self.load_init else None,
                                                 mean_init=self.inits['final_point_BN_m'] if self.load_init else None,
                                                 var_init=self.inits['final_point_BN_v'] if self.load_init else None,
                                                 k_init=self.inits['final_point_k'] if self.load_init else None,
                                                 b_init=self.inits['final_point_b'] if self.load_init else None,
+                                                BN_momentum=self.BN_momentum,
+                                                  **kwargs,
+                                                  name = 'final_pointwise')
+        
+        self.final_pointwise_conv_rna = conv_block(filters=self.filter_list_seq[-1] // self.final_point_scale,
                                                 BN_momentum=self.BN_momentum,
                                                   **kwargs,
                                                   name = 'final_pointwise')
@@ -273,21 +280,27 @@ class genformer(tf.keras.Model):
         motif_activity = self.motif_activity_fc1(motif_activity)
         motif_activity = self.motif_dropout1(motif_activity,training=training)
         motif_activity = self.motif_activity_fc2(motif_activity)
+        motif_activity = self.motif_dropout2(motif_activity,training=training)
         motif_activity = tf.tile(motif_activity, [1, self.output_length, 1])
 
-        transformer_input = tf.concat([sequence,atac_x, motif_activity], 
+        transformer_input = tf.concat([sequence,atac_x, motif_activity],
                                       axis=2) # append processed seq,atac,motif inputs in channel dim.
+        transformer_input = self.pre_transformer_projection(transformer_input)
         out_performer,att_matrices = self.performer(transformer_input, training=training)
-        
-        out = self.final_pointwise_conv(out_performer, training=training) ## 
-        out = self.dropout(out, training=training) ## 0.05 default in tom's implementation
-        out = self.gelu(out)
-        out_atac = self.final_dense_profile(out, training=training)
-        out_rna = self.final_dense_profile_rna(out, training=training)
 
-        out_profile_atac = self.crop_final(out_atac) ## tom crops only on loss, tom will try cropping less 
-        out_profile_rna = self.crop_final(out_rna) ## tom crops only on loss, tom will try cropping less 
-        return out_profile_atac,out_profile_rna
+        out_atac = self.final_pointwise_conv_atac(out_performer, training=training) ##
+        out_atac = self.dropout(out_atac, training=training) ## 0.05 default in tom's implementation
+        out_atac = self.gelu(out_atac)
+        out_atac = self.final_dense_profile(out_atac, training=training)
+        out_atac = self.crop_final(out_atac) ## tom crops only on loss, tom will try cropping less
+
+        out_rna = self.final_pointwise_conv_atac(out_performer, training=training) ##
+        out_rna = self.dropout(out_rna, training=training) ## 0.05 default in tom's implementation
+        out_rna = self.gelu(out_rna)
+        out_rna = self.final_dense_profile(out_rna, training=training)
+        out_rna = self.crop_final(out_rna) ## tom crops only on loss, tom will try cropping less
+
+        return out_atac,out_rna
 
     def get_config(self):
         config = {
@@ -297,7 +310,6 @@ class genformer(tf.keras.Model):
             "num_heads": self.num_heads,
             "input_length": self.input_length,
             "numerical_stabilizer": self.numerical_stabilizer,
-            "nb_random_features": self.nb_random_features,
             "num_transformer_layers": self.num_transformer_layers,
             "output_length": self.output_length,
             "final_output_length": self.final_output_length,
@@ -332,10 +344,10 @@ class genformer(tf.keras.Model):
         sequence,atac,motif_activity = inputs
 
         # sequence input processing
-        x = self.stem_conv(sequence, training=training)
-        x = self.stem_res_conv(x, training=training)
-        x = self.stem_pool(x, training=training)
-        x = self.conv_tower(x, training=training)
+        sequence = self.stem_conv(sequence, training=training)
+        sequence = self.stem_res_conv(sequence, training=training)
+        sequence = self.stem_pool(sequence, training=training)
+        sequence = self.conv_tower(sequence, training=training)
 
         # atac input processsing
         atac_x = self.stem_conv_atac(atac, training=training)
@@ -347,21 +359,23 @@ class genformer(tf.keras.Model):
         motif_activity = self.motif_activity_fc1(motif_activity)
         motif_activity = self.motif_dropout1(motif_activity,training=training)
         motif_activity = self.motif_activity_fc2(motif_activity)
-        motif_activity = tf.tile(motif_activity, [1, 4096, 1])
+        motif_activity = self.motif_dropout2(motif_activity,training=training)
+        motif_activity = tf.tile(motif_activity, [1, self.output_length, 1])
 
-        transformer_input = tf.concat([x,atac_x, motif_activity], axis=2) # append processed seq,atac,motif inputs in channel dim.
+        transformer_input = tf.concat([sequence,atac_x, motif_activity],
+                                                                    axis=2) # append processed seq,atac,motif inputs in channel dim.
         out_performer,att_matrices = self.performer(transformer_input, training=training)
-        out = self.crop_final(out_performer)
 
-        out_atac = self.final_pointwise_conv(out, training=training)
-        out_atac = self.dropout(out_atac, training=training)
+        out_atac = self.final_pointwise_conv_atac(out_performer, training=training) ##
+        out_atac = self.dropout(out_atac, training=training) ## 0.05 default in tom's implementation
         out_atac = self.gelu(out_atac)
-        out_profile_atac = self.final_dense_profile(out_atac, training=training)
+        out_atac = self.final_dense_profile(out_atac, training=training)
+        out_atac = self.crop_final(out_atac) ## tom crops only on loss, tom will try cropping less
 
-        ## add layers for RNA prediction
-        out_rna = self.final_pointwise_conv_rna(out, training=training)
-        out_rna = self.dropout(out_rna, training=training)
+        out_rna = self.final_pointwise_conv_atac(out_performer, training=training) ##
+        out_rna = self.dropout(out_rna, training=training) ## 0.05 default in tom's implementation
         out_rna = self.gelu(out_rna)
-        out_profile_rna = self.final_dense_profile_rna(out_rna, training=training)
+        out_rna = self.final_dense_profile(out_rna, training=training)
+        out_rna = self.crop_final(out_rna) ## tom crops only on loss, tom will try cropping less
 
-        return out_profile_atac,out_profile_rna,att_matrices
+        return out_atac,out_rna, att_matrices
