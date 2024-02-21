@@ -19,7 +19,7 @@ python3 train_model_atac_rna.py \
             --final_output_length=896 \
             --max_shift=4 \
             --batch_size=1 \
-            --val_examples_ho=38880 \
+            --val_examples_ho=30696 \
             --BN_momentum=0.90 \
             --patience=50 \
             --output_res=128 \
