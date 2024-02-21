@@ -17,7 +17,7 @@ tf.keras.backend.set_floatx('float32')
 
 def return_train_val_functions(model, optimizers_in,
                                strategy, metric_dict, num_replicas,
-                               loss_type,total_weight=0.15,atac_scale=0.10,unmask_loss=False):
+                               loss_type,total_weight=0.15,atac_scale=0.10):
     """Return training, validation, and build step functions
     Args:
         model: the input genformer model
@@ -42,10 +42,6 @@ def return_train_val_functions(model, optimizers_in,
     metric_dict['ATAC_R2_tr'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
     metric_dict['ATAC_PearsonR'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
     metric_dict['ATAC_R2'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
-
-    if unmask_loss: 
-        metric_dict['ATAC_PearsonR_um'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
-        metric_dict['ATAC_R2_um'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
 
     metric_dict['RNA_PearsonR'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
     metric_dict['RNA_R2'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
@@ -87,7 +83,7 @@ def return_train_val_functions(model, optimizers_in,
                                     model.final_dense_profile.trainable_variables
 
             output_heads_rna = model.final_dense_profile_rna.trainable_variables
-            
+
             all_vars = base_weights + output_heads_rna
 
             output_atac,output_rna = model(input_tuple, training=True)
@@ -99,12 +95,6 @@ def return_train_val_functions(model, optimizers_in,
             target_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(target_atac, mask_indices), axis=0), axis=2)
             output_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_atac, mask_indices), axis=0), axis=2)
             atac_loss = tf.reduce_mean(loss_fn(target_atac, output_atac)) * (1.0/num_replicas)
-
-            if unmask_loss:
-                unmask_indices = tf.where(unmask == 1) # extract indices of masked bins
-                target_atac_um = tf.expand_dims(tf.expand_dims(tf.gather_nd(target_atac, unmask_indices), axis=0), axis=2)
-                output_atac_um = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_atac, unmask_indices), axis=0), axis=2)
-                atac_loss += (tf.reduce_mean(loss_fn(target_atac_um, output_atac_um)) * (1.0/num_replicas))
 
             #### rna loss
             rna_loss = tf.reduce_mean(loss_fn(target_rna, output_rna)) * (1.0/num_replicas)
@@ -140,14 +130,6 @@ def return_train_val_functions(model, optimizers_in,
         output_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_atac, mask_indices), axis=0), axis=2)
 
         atac_loss = tf.reduce_mean(loss_fn(target_atac, output_atac)) * (1.0/num_replicas)
-        if unmask_loss:
-            unmask_indices = tf.where(unmask_loss == 1) # extract indices of masked bins
-            target_atac_um = tf.expand_dims(tf.expand_dims(tf.gather_nd(target_atac, unmask_indices), axis=0), axis=2)
-            output_atac_um = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_atac, unmask_indices), axis=0), axis=2)
-            atac_loss += (tf.reduce_mean(loss_fn(target_atac_um, output_atac_um)) * (1.0/num_replicas))
-            metric_dict['ATAC_PearsonR_um'].update_state(target_atac_um, output_atac_um)
-            metric_dict['ATAC_R2_um'].update_state(target_atac_um, output_atac_um)
-
         rna_loss = tf.reduce_mean(loss_fn(target_rna, output_rna)) * (1.0/num_replicas)
 
         loss = atac_scale * atac_loss + rna_loss

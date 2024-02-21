@@ -125,8 +125,7 @@ def main():
             'warmup_steps': float(args.warmup_steps),
             'return_constant_lr': parse_bool_str(args.return_constant_lr),
             'atac_scale': float(args.atac_scale),
-            'load_init_FT': parse_bool_str(args.load_init_FT),
-            'unmask_loss': parse_bool_str(args.unmask_loss)
+            'load_init_FT': parse_bool_str(args.load_init_FT)
     }
 
     wandb.init(config=config,
@@ -259,8 +258,7 @@ def main():
                 num_replicas=NUM_REPLICAS,
                 loss_type=wandb.config.loss_type,
                 total_weight=wandb.config.total_weight_loss,
-                atac_scale=wandb.config.atac_scale,
-                unmask_loss=wandb.config.unmask_loss
+                atac_scale=wandb.config.atac_scale
             )
         
 
