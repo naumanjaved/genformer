@@ -122,7 +122,7 @@ def main():
             'max_shift': int(args.max_shift),
             'crop_size': (int(args.output_length) - int(args.final_output_length))//2,
             'reset_optimizer_state': parse_bool_str(args.reset_optimizer_state),
-            'warmup_fraction': float(args.warmup_frac),
+            'warmup_steps': float(args.warmup_steps),
             'return_constant_lr': parse_bool_str(args.return_constant_lr),
             'atac_scale': float(args.atac_scale),
             'load_init_FT': parse_bool_str(args.load_init_FT),
