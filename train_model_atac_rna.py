@@ -15,6 +15,8 @@ import src.optimizers as optimizers
 import training_utils_atac_rna as training_utils
 import src.schedulers as schedulers
 
+import src.load_weights_atac_rna as load_weights_atac_rna
+
 # Function to parse boolean string values
 def parse_bool_str(input_str):
     if input_str in ['False', 'false', 'FALSE', 'F']:
@@ -122,7 +124,9 @@ def main():
             'reset_optimizer_state': parse_bool_str(args.reset_optimizer_state),
             'warmup_fraction': float(args.warmup_frac),
             'return_constant_lr': parse_bool_str(args.return_constant_lr),
-            'atac_scale': float(args.atac_scale)
+            'atac_scale': float(args.atac_scale),
+            'load_init_FT': parse_bool_str(args.load_init_FT),
+            'unmask_loss': parse_bool_str(args.unmask_loss)
     }
 
     wandb.init(config=config,
@@ -139,7 +143,7 @@ def main():
         # TFrecord dataset options
         options = tf.data.Options()
         options.experimental_distribute.auto_shard_policy=\
-            tf.data.experimental.AutoShardPolicy.DATA
+            tf.data.experimental.AutoShardPolicy.FILE
         options.deterministic=False
         options_val = tf.data.Options()
         options_val.experimental_distribute.auto_shard_policy=\
@@ -207,15 +211,17 @@ def main():
         print('initialized model')
 
         # initialize optimizer with warmup and cosine decay
-        init_learning_rate=1.0e-06
-        optimizer1 = tf.keras.optimizers.Adam(learning_rate=init_learning_rate,
+        init_learning_rate=1.0e-07
+        optimizer1 = tf.keras.optimizers.AdamW(learning_rate=init_learning_rate,
                                                 epsilon=wandb.config.epsilon,
+                                                weight_decay=1.0e-05,
                                                 global_clipnorm=wandb.config.gradient_clip)
         optimizer1.exclude_from_weight_decay(var_names = ['bias', 'batch_norm','layer_norm',
                                                         'BN', 'LN', 'LayerNorm','BatchNorm'])
         
-        optimizer2 = tf.keras.optimizers.Adam(learning_rate=init_learning_rate,
+        optimizer2 = tf.keras.optimizers.AdamW(learning_rate=init_learning_rate,
                                                 epsilon=wandb.config.epsilon,
+                                                weight_decay=1.0e-05,
                                                 global_clipnorm=wandb.config.gradient_clip)
         optimizer2.exclude_from_weight_decay(var_names = ['bias', 'batch_norm','layer_norm',
                                                         'BN', 'LN', 'LayerNorm','BatchNorm'])
@@ -254,7 +260,7 @@ def main():
                 loss_type=wandb.config.loss_type,
                 total_weight=wandb.config.total_weight_loss,
                 atac_scale=wandb.config.atac_scale,
-                unmask_loss=False
+                unmask_loss=wandb.config.unmask_loss
             )
         
 
@@ -284,7 +290,7 @@ def main():
 
         local_epoch = 0
         print(wandb.config)
-        
+        val_pearsons=[]
         for epoch_idx in range(wandb.config.num_epochs):
             #epoch_i = (epoch_idx + wandb.config.num_epochs_to_start) % len(train_human_its_mult)
             step_num = (wandb.config.num_epochs_to_start + epoch_idx) * \
@@ -306,13 +312,13 @@ def main():
             for k in range(wandb.config.train_steps):
                 lr1 = schedulers.cos_w_warmup(current_optimizer_step,
                                              wandb.config.lr_base1,
-                                             (wandb.config.warmup_fraction*wandb.config.total_steps),
+                                             wandb.config.warmup_steps,
                                              wandb.config.decay_steps,
                                              wandb.config.decay_frac,
                                              wandb.config.return_constant_lr)
                 lr2 = schedulers.cos_w_warmup(current_optimizer_step,
                                              wandb.config.lr_base2,
-                                             (wandb.config.warmup_fraction*wandb.config.total_steps),
+                                             wandb.config.warmup_steps,
                                              wandb.config.decay_steps,
                                              wandb.config.decay_frac,
                                              wandb.config.return_constant_lr)
@@ -329,16 +335,18 @@ def main():
             optimizer_step_track.assign(current_optimizer_step)
             print('lr1 at:' + str(optimizer1.lr.values[0]))
             print('lr2 at:' + str(optimizer2.lr.values[0]))
-            train_loss = metric_dict['train_loss'].result().numpy() #this is the per example loss * NUM_REPLICAS # multiply by NUM_REPLICAS to get total loss
+            train_loss = NUM_REPLICAS*metric_dict['train_loss'].result().numpy() #this is the per example loss * NUM_REPLICAS # multiply by NUM_REPLICAS to get total loss
             print('train_loss: ' + str(train_loss))
+            print('train_loss_atac: ' + str(NUM_REPLICAS*metric_dict['train_loss_atac'].result().numpy()))
+            print('train_loss_rna: ' + str(NUM_REPLICAS*metric_dict['train_loss_rna'].result().numpy()))
 
-            wandb.log({'train_loss': train_loss,
-                       'train_loss_atac': metric_dict['train_loss_atac'].result().numpy(),
-                       'train_loss_rna': metric_dict['train_loss_rna'].result().numpy(),},
+            wandb.log({'train_loss': NUM_REPLICAS*train_loss,
+                       'train_loss_atac': NUM_REPLICAS*metric_dict['train_loss_atac'].result().numpy(),
+                       'train_loss_rna': NUM_REPLICAS*metric_dict['train_loss_rna'].result().numpy()},
                         step=step_num)
             wandb.log({'ATAC_PearsonR_tr': metric_dict['ATAC_PearsonR_tr'].result()['PearsonR'].numpy(),
                         'ATAC_R2_tr': metric_dict['ATAC_R2_tr'].result()['R2'].numpy(),
-                        'RNA_pearsonR_tr': metric_dict['RNA_pearsonR_tr'].result()['PearsonR'].numpy(),
+                        'RNA_PearsonR_tr': metric_dict['RNA_PearsonR_tr'].result()['PearsonR'].numpy(),
                         'RNA_R2_tr': metric_dict['RNA_R2_tr'].result()['R2'].numpy()},
                         step=step_num)
 
@@ -394,9 +402,6 @@ def main():
                         'RNA_R2': metric_dict['RNA_R2'].result()['R2'].numpy()},
                         step=step_num)
             
-            if wandb.config.unmask_loss:
-                print('ATAC_pearsons_um: ' + str(metric_dict['ATAC_PearsonR_um'].result()['PearsonR'].numpy()))
-                print('ATAC_R2_um: ' + str(metric_dict['ATAC_R2_um'].result()['R2'].numpy()))
             wandb.log({'ATAC_pearsons': metric_dict['ATAC_PearsonR'].result()['PearsonR'].numpy(),
                         'ATAC_R2': metric_dict['ATAC_R2'].result()['R2'].numpy()},
                         step=step_num)

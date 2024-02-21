@@ -35,10 +35,10 @@ python3 train_model_atac_rna.py \
             --rectify="True" \
             --filter_list_seq="512,640,640,768,896,1024" \
             --filter_list_atac="32,64" \
-            --atac_mask_dropout=0.15 \
-            --atac_mask_dropout_val=0.15 \
+            --atac_mask_dropout=0.05 \
+            --atac_mask_dropout_val=0.05 \
             --log_atac="False" \
-            --random_mask_size="1536" \
+            --random_mask_size="512" \
             --use_atac="True" \
             --final_point_scale="6" \
             --use_seq="True" \

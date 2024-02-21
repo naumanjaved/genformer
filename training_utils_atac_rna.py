@@ -10,6 +10,7 @@ import src.metrics as metrics
 import src.utils
 from src.losses import poisson_multinomial
 from scipy.stats import zscore as zscore
+import pandas as pd 
 
 
 tf.keras.backend.set_floatx('float32')
@@ -81,11 +82,13 @@ def return_train_val_functions(model, optimizers_in,
                                     model.motif_activity_fc1.trainable_variables + \
                                     model.motif_activity_fc2.trainable_variables + \
                                     model.performer.trainable_variables + \
+                                    model.pre_transformer_projection.trainable_variables + \
                                     model.final_pointwise_conv_atac.trainable_variables + \
                                     model.final_dense_profile.trainable_variables
 
-            output_heads_rna = model.final_pointwise_conv_rna.trainable_variables + \
-                                model.final_dense_profile_rna.trainable_variables
+            output_heads_rna = model.final_dense_profile_rna.trainable_variables
+            
+            all_vars = base_weights + output_heads_rna
 
             output_atac,output_rna = model(input_tuple, training=True)
             output_atac = tf.cast(output_atac,dtype=tf.float32)
@@ -106,10 +109,9 @@ def return_train_val_functions(model, optimizers_in,
             #### rna loss
             rna_loss = tf.reduce_mean(loss_fn(target_rna, output_rna)) * (1.0/num_replicas)
 
-
             loss = atac_scale * atac_loss + rna_loss
 
-        gradients = tape.gradient(loss, model.trainable_variables)
+        gradients = tape.gradient(loss, all_vars)
         optimizer1.apply_gradients(zip(gradients[:len(base_weights)], base_weights))
         optimizer2.apply_gradients(zip(gradients[len(base_weights):], output_heads_rna))
         metric_dict["train_loss"].update_state(loss)
@@ -124,7 +126,7 @@ def return_train_val_functions(model, optimizers_in,
     def dist_val_step(inputs):  # main validation step
         print('tracing validation step!')
         sequence,atac,mask,unmask,target_atac,\
-            motif_activity,target_rna, tss_tokens,gene_token,cell_type =inputs
+            motif_activity,target_rna,tss_tokens,gene_token,cell_type =inputs
         
         input_tuple = sequence,atac,motif_activity
 
@@ -166,11 +168,10 @@ def return_train_val_functions(model, optimizers_in,
     def build_step(iterator): # just to build the model
         @tf.function(reduce_retracing=True)
         def val_step(inputs):
-            sequence,atac,mask,target_atac,\
+            sequence,atac,mask,unmask,target_atac,\
                 motif_activity,target_rna,tss_tokens,gene_token,cell_type =inputs
             input_tuple = sequence,atac,motif_activity
             model(input_tuple, training=False)
-
         strategy.run(val_step, args=(next(iterator),))
 
     return dist_train_step,dist_val_step,build_step,metric_dict
@@ -710,7 +711,7 @@ def parse_args(parser):
     parser.add_argument('--total_weight_loss',type=str, default="0.15", help= 'total_weight_loss')
     parser.add_argument('--use_rot_emb',type=str, default="True", help= 'use_rot_emb')
     parser.add_argument('--run_id', type=str, default=None)
-    parser.add_argument('--warmup_frac', type=float, default=1.0)
+    parser.add_argument('--warmup_steps', type=int, default=5000)
     parser.add_argument('--num_epochs', type=int, default=100)
     parser.add_argument('--reset_optimizer_state',type=str, default="False", help= 'reset_optimizer_state')
     parser.add_argument('--return_constant_lr',type=str, default="False", help= 'return_constant_lr')

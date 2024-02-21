@@ -21,14 +21,17 @@ from tensorflow.keras.layers.experimental import SyncBatchNormalization as syncb
 class SoftmaxPooling1D(kl.Layer):
     """Softmax pooling layer."""
     def __init__(self,
-                 pool_size=2, w_init_scale=2.0, name='softmax_pooling', **kwargs):
+                 pool_size=2, 
+                 w_init_scale=2.0, 
+                 kernel_init=None,
+                 name='softmax_pooling', **kwargs):
         super().__init__(name=name, **kwargs)
         self.pool_size = pool_size
         self.w_init_scale = w_init_scale
         self.dense = kl.Dense(
             units = 1,
             use_bias=False,
-            kernel_initializer='lecun_normal')
+            kernel_initializer=kernel_init if kernel_init is not None else 'lecun_normal')
 
     def call(self, inputs, **kwargs):
         _, length, num_features = inputs.shape
