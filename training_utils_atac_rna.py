@@ -227,7 +227,7 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
     atac_target = atac ## store the target ATAC, as we will subsequently directly manipulate atac for masking
 
     # rna output, cast to float32 
-    rna = tf.ensure_shape(tf.io.parse_tensor(data['rna'], out_type=tf.float16), [output_length,1])
+    rna = tf.ensure_shape(tf.io.parse_tensor(data['rna'], out_type=tf.float32), [output_length,1])
     rna = tf.cast(rna,dtype=tf.float32)
     rna = tf.slice(rna, [crop_size,0], [output_length-2*crop_size,-1]) # crop at the outset 
     rna = tf.clip_by_value(rna, clip_value_min=0.0, clip_value_max=65500.0) # clip the targets
@@ -363,12 +363,12 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
     data = tf.io.parse_example(serialized_example, feature_map)
 
     # atac input, cast to float32 
-    atac = tf.ensure_shape(tf.io.parse_tensor(data['atac'], out_type=tf.float16), [output_length_ATAC,1])
+    atac = tf.ensure_shape(tf.io.parse_tensor(data['atac'], out_type=tf.float32), [output_length_ATAC,1])
     atac = tf.cast(atac,dtype=tf.float32)
     atac_target = atac ## store the target ATAC, as we will subsequently directly manipulate atac for masking
 
     # rna output, cast to float32 
-    rna = tf.ensure_shape(tf.io.parse_tensor(data['rna'], out_type=tf.float16), [output_length,1])
+    rna = tf.ensure_shape(tf.io.parse_tensor(data['rna'], out_type=tf.float32), [output_length,1])
     rna = tf.cast(rna,dtype=tf.float32)
     rna = tf.slice(rna, [crop_size,0], [output_length-2*crop_size,-1]) # crop at the outset
     rna = tf.clip_by_value(rna, clip_value_min=0.0, clip_value_max=65500.0) # clip the targets
