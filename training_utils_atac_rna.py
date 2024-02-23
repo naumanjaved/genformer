@@ -238,7 +238,7 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
                                   axis=1)
     peaks_c_crop = tf.slice(peaks_center, [crop_size,0], [output_length-2*crop_size,-1]) # crop at the outset 
     # TF activity, cast to float32 and expand dims to allow for processing by model input FC layers
-    motif_activity = tf.ensure_shape(tf.io.parse_tensor(data['motif_activity'], out_type=tf.float16), [693])
+    motif_activity = tf.ensure_shape(tf.io.parse_tensor(data['motif_activity'], out_type=tf.float32), [693])
     motif_activity = tf.cast(motif_activity,dtype=tf.float32)
     motif_activity = tf.expand_dims(motif_activity,axis=0)
     min_val = tf.reduce_min(motif_activity)
@@ -414,7 +414,7 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
     sequence = one_hot(tf.strings.substr(data['sequence'], shift,input_length))
 
     # motif activity, cast to float32 and expand dims to allow for processing by model input FC layers
-    motif_activity = tf.ensure_shape(tf.io.parse_tensor(data['motif_activity'], out_type=tf.float16), [693])
+    motif_activity = tf.ensure_shape(tf.io.parse_tensor(data['motif_activity'], out_type=tf.float32), [693])
     motif_activity = tf.cast(motif_activity,dtype=tf.float32)
     motif_activity = tf.expand_dims(motif_activity,axis=0)
     min_val = tf.reduce_min(motif_activity)
