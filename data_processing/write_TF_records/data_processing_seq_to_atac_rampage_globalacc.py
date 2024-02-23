@@ -362,7 +362,7 @@ def _bytes_feature(value):
     return tf.train.Feature(bytes_list=tf.train.BytesList(value=[value]))
 
 def _tensor_feature_float(numpy_array):
-    serialized_tensor = tf.io.serialize_tensor(tf.convert_to_tensor(numpy_array, dtype=tf.float16))
+    serialized_tensor = tf.io.serialize_tensor(tf.convert_to_tensor(numpy_array, dtype=tf.float32))
     return tf.train.Feature(bytes_list=tf.train.BytesList(value=[serialized_tensor.numpy()]))
 
 def _tensor_feature_int(numpy_array):
