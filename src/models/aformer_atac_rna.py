@@ -226,7 +226,7 @@ class genformer(tf.keras.Model):
                                              target_length=self.final_output_length,
                                              name='target_input')
 
-        self.final_pointwise_conv_atac = conv_block(filters=self.filter_list_seq[-1] // self.final_point_scale,
+        self.final_pointwise_conv = conv_block(filters=self.filter_list_seq[-1] // self.final_point_scale,
                                                 beta_init=self.inits['final_point_BN_b'] if self.load_init else None,
                                                 gamma_init=self.inits['final_point_BN_g'] if self.load_init else None,
                                                 mean_init=self.inits['final_point_BN_m'] if self.load_init else None,
@@ -235,7 +235,7 @@ class genformer(tf.keras.Model):
                                                 b_init=self.inits['final_point_b'] if self.load_init else None,
                                                 BN_momentum=self.BN_momentum,
                                                   **kwargs,
-                                                  name = 'final_pointwise_atac')
+                                                  name = 'final_pointwise')
 
         self.final_dense_profile = kl.Dense(1,
                                             activation='softplus',
@@ -283,9 +283,10 @@ class genformer(tf.keras.Model):
         transformer_input = self.pre_transformer_projection(transformer_input)
         out_performer,att_matrices = self.performer(transformer_input, training=training)
 
-        out = self.final_pointwise_conv_atac(out_performer, training=training) ##
+        out = self.final_pointwise_conv(out_performer, training=training) ##
         out = self.dropout(out, training=training) ## 0.05 default in tom's implementation
         out = self.gelu(out)
+
         out_atac = self.final_dense_profile(out, training=training)
         out_atac = self.crop_final(out_atac) ## tom crops only on loss, tom will try cropping less
 
