@@ -224,7 +224,7 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
     # atac input, cast to float32 
     atac = tf.ensure_shape(tf.io.parse_tensor(data['atac'], out_type=tf.float32), 
                                    [output_length_ATAC,1])
-    atac = atac + tf.math.abs(g_val.normal(atac.shape,mean=1.0e-04,stddev=1.0e-04,dtype=tf.float32))
+    atac = atac + tf.math.abs(g.normal(atac.shape,mean=1.0e-04,stddev=1.0e-04,dtype=tf.float32))
     atac_target = atac ## store the target ATAC, as we will subsequently directly manipulate atac for masking
 
     # rna output, cast to float32 
