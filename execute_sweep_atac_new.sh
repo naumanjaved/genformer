@@ -54,4 +54,5 @@ python3 train_model_atac.py \
             --loss_type="poisson" \
             --model_save_basename="genformer" \
             --warmup_steps=5000 \
-            --decay_steps=500000
+            --decay_steps=500000 \
+            --weight_decay=1.0e-05
