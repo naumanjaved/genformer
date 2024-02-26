@@ -86,13 +86,14 @@ def return_train_val_functions(model, optimizers_in,
                                     model.motif_activity_fc1.trainable_variables + \
                                     model.motif_activity_fc2.trainable_variables + \
                                     model.performer.trainable_variables + \
-                                    model.pre_transformer_projection.trainable_variables + \
-                                    model.final_pointwise_conv.trainable_variables + \
-                                    model.final_dense_profile.trainable_variables
+                                    model.pre_transformer_projection.trainable_variables
 
-            output_heads_rna = model.final_dense_profile_rna.trainable_variables
+            output_heads = model.final_pointwise_conv.trainable_variables + \
+                                model.final_dense_profile.trainable_variables + \
+                                model.final_pointwise_conv_rna.trainable_variables + \
+                                model.final_dense_profile_rna.trainable_variables
 
-            all_vars = base_weights + output_heads_rna
+            all_vars = base_weights + output_heads
 
             output_atac,output_rna = model(input_tuple, training=True)
             output_atac = tf.cast(output_atac,dtype=tf.float32)
