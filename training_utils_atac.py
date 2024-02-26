@@ -632,6 +632,7 @@ def parse_args(parser):
     parser.add_argument('--return_constant_lr',type=str, default="False", help= 'return_constant_lr')
     parser.add_argument('--unmask_loss',type=str, default="False", help= 'unmask_loss')
     parser.add_argument('--step_to_start',type=int,default=0,help='step_to_start')
+    parser.add_argument('--weight_decay',type=float,default=1.0e-05,help='weight_decay')
     args = parser.parse_args()
     return parser
 

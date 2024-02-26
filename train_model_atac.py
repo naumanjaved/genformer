@@ -117,7 +117,8 @@ def main():
             'reset_optimizer_state': parse_bool_str(args.reset_optimizer_state),
             'warmup_steps': float(args.warmup_steps),
             'return_constant_lr': parse_bool_str(args.return_constant_lr),
-            'unmask_loss': parse_bool_str(args.unmask_loss)
+            'unmask_loss': parse_bool_str(args.unmask_loss),
+            'weight_decay': float(args.weight_decay)
     }
 
     wandb.init(config=config,
@@ -197,7 +198,7 @@ def main():
         init_learning_rate=1.0e-07
         optimizer = tf.keras.optimizers.AdamW(learning_rate=init_learning_rate,
                                                 epsilon=wandb.config.epsilon,
-                                                weight_decay=1.0e-05,
+                                                weight_decay=wandb.config.weight_decay,
                                                 global_clipnorm=wandb.config.gradient_clip)
         optimizer.exclude_from_weight_decay(var_names = ['bias', 'batch_norm','layer_norm',
                                                         'BN', 'LN', 'LayerNorm','BatchNorm'])
