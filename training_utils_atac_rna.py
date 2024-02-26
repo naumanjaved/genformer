@@ -52,8 +52,8 @@ def return_train_val_functions(model, optimizers_in,
     metric_dict['RNA_R2_tr'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
     metric_dict['RNA_PearsonR'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
     metric_dict['RNA_R2'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
-    metric_dict['RNA_PearsonR_ho'] = metrics.MetricDict({'PearsonR_ho': metrics.PearsonR(reduce_axis=(0,1))})
-    metric_dict['RNA_R2_ho'] = metrics.MetricDict({'R2_ho': metrics.R2(reduce_axis=(0,1))})
+    metric_dict['RNA_PearsonR_ho'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
+    metric_dict['RNA_R2_ho'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
 
 
     optimizer1,optimizer2=optimizers_in
@@ -112,7 +112,7 @@ def return_train_val_functions(model, optimizers_in,
 
         gradients = tape.gradient(loss, all_vars)
         optimizer1.apply_gradients(zip(gradients[:len(base_weights)], base_weights))
-        optimizer2.apply_gradients(zip(gradients[len(base_weights):], output_heads_rna))
+        optimizer2.apply_gradients(zip(gradients[len(base_weights):], output_heads))
         metric_dict["train_loss"].update_state(loss)
         metric_dict["train_loss_rna"].update_state(rna_loss)
         metric_dict["train_loss_atac"].update_state(atac_loss)
@@ -137,8 +137,9 @@ def return_train_val_functions(model, optimizers_in,
         # subset target and predictions to masked bins
         target_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(target_atac, mask_indices), axis=0), axis=2)
         output_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_atac, mask_indices), axis=0), axis=2)
-
         atac_loss = tf.reduce_mean(loss_fn(target_atac, output_atac)) * (1.0/num_replicas)
+
+
         rna_loss = tf.reduce_mean(loss_fn(target_rna, output_rna)) * (1.0/num_replicas)
 
         loss = atac_scale * atac_loss + rna_loss

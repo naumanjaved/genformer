@@ -50,8 +50,8 @@ python3 train_model_atac_rna.py \
             --lr_base1="1.0e-04" \
             --lr_base2="1.0e-04" \
             --decay_frac="0.10" \
-            --gradient_clip="0.20" \
-            --seed=5 \
+            --gradient_clip="1.0" \
+            --seed=9 \
             --val_data_seed=19 \
             --loss_type="poisson" \
             --model_save_basename="genformer" \
@@ -59,4 +59,4 @@ python3 train_model_atac_rna.py \
             --decay_steps=500000 \
             --load_init_FT="False" \
             --load_init="False" \
-            --atac_scale="0.05" 
+            --atac_scale="0.01" 
