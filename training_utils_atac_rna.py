@@ -37,16 +37,24 @@ def return_train_val_functions(model, optimizers_in,
     metric_dict["val_loss"] = tf.keras.metrics.Mean("val_loss",dtype=tf.float32)
     metric_dict["val_loss_atac"] = tf.keras.metrics.Mean("val_loss_atac",dtype=tf.float32)
     metric_dict["val_loss_rna"] = tf.keras.metrics.Mean("val_loss_rna",dtype=tf.float32)
+    metric_dict["val_loss_ho"] = tf.keras.metrics.Mean("val_loss_ho",dtype=tf.float32)
+    metric_dict["val_loss_atac_ho"] = tf.keras.metrics.Mean("val_loss_atac_ho",dtype=tf.float32)
+    metric_dict["val_loss_rna_ho"] = tf.keras.metrics.Mean("val_loss_rna_ho",dtype=tf.float32)
 
     metric_dict['ATAC_PearsonR_tr'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
     metric_dict['ATAC_R2_tr'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
     metric_dict['ATAC_PearsonR'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
     metric_dict['ATAC_R2'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
+    metric_dict['ATAC_PearsonR_ho'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
+    metric_dict['ATAC_R2_ho'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
 
-    metric_dict['RNA_PearsonR'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
-    metric_dict['RNA_R2'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
     metric_dict['RNA_PearsonR_tr'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
     metric_dict['RNA_R2_tr'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
+    metric_dict['RNA_PearsonR'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
+    metric_dict['RNA_R2'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
+    metric_dict['RNA_PearsonR_ho'] = metrics.MetricDict({'PearsonR_ho': metrics.PearsonR(reduce_axis=(0,1))})
+    metric_dict['RNA_R2_ho'] = metrics.MetricDict({'R2_ho': metrics.R2(reduce_axis=(0,1))})
+
 
     optimizer1,optimizer2=optimizers_in
 
@@ -145,6 +153,41 @@ def return_train_val_functions(model, optimizers_in,
         target_rna_agg = tf.math.reduce_sum((target_rna * tss_tokens)[:,:,0], axis=1)
         output_rna_agg = tf.math.reduce_sum((output_rna * tss_tokens)[:,:,0], axis=1)
         return target_rna_agg,output_rna_agg, gene_token, cell_type
+    
+
+    @tf.function(reduce_retracing=True)
+    def dist_val_step_ho(inputs):  # main validation step
+        print('tracing validation step!')
+        sequence,atac,mask,unmask,target_atac,\
+            motif_activity,target_rna,tss_tokens,gene_token,cell_type =inputs
+        
+        input_tuple = sequence,atac,motif_activity
+
+        output_atac,output_rna = model(input_tuple, training=False)
+        output_atac = tf.cast(output_atac,dtype=tf.float32)
+        output_rna = tf.cast(output_rna,dtype=tf.float32)
+
+        mask_indices = tf.where(mask == 1) # extract indices of masked bins
+        # subset target and predictions to masked bins
+        target_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(target_atac, mask_indices), axis=0), axis=2)
+        output_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_atac, mask_indices), axis=0), axis=2)
+
+        atac_loss = tf.reduce_mean(loss_fn(target_atac, output_atac)) * (1.0/num_replicas)
+        rna_loss = tf.reduce_mean(loss_fn(target_rna, output_rna)) * (1.0/num_replicas)
+
+        loss = atac_scale * atac_loss + rna_loss
+
+        metric_dict["val_loss_ho"].update_state(loss)
+        metric_dict["val_loss_rna_ho"].update_state(rna_loss)
+        metric_dict["val_loss_atac_ho"].update_state(atac_loss)
+        metric_dict['ATAC_PearsonR_ho'].update_state(target_atac, output_atac)
+        metric_dict['ATAC_R2_ho'].update_state(target_atac, output_atac)
+        metric_dict['RNA_PearsonR_ho'].update_state(target_rna, output_rna)
+        metric_dict['RNA_R2_ho'].update_state(target_rna, output_rna)
+
+        target_rna_agg = tf.math.reduce_sum((target_rna * tss_tokens)[:,:,0], axis=1)
+        output_rna_agg = tf.math.reduce_sum((output_rna * tss_tokens)[:,:,0], axis=1)
+        return target_rna_agg,output_rna_agg, gene_token, cell_type
 
 
     def build_step(iterator): # just to build the model
@@ -156,7 +199,7 @@ def return_train_val_functions(model, optimizers_in,
             model(input_tuple, training=False)
         strategy.run(val_step, args=(next(iterator),))
 
-    return dist_train_step,dist_val_step,build_step,metric_dict
+    return dist_train_step,dist_val_step,dist_val_step_ho,build_step,metric_dict
 
 @tf.function
 def deserialize_tr(serialized_example, g, use_motif_activity,
@@ -567,6 +610,13 @@ def return_distributed_iterators(gcs_path, gcs_path_ho, global_batch_size,
                              num_epoch, atac_mask_dropout, random_mask_size,
                              log_atac, use_atac, use_seq, seed,
                              atac_corrupt_rate, validation_steps, use_motif_activity, g)
+    
+    val_data = return_dataset(gcs_path, "valid", global_batch_size, input_length,
+                                 output_length_ATAC, output_length, crop_size,
+                                 output_res, max_shift, options_val, num_parallel_calls, num_epoch,
+                                 atac_mask_dropout_val, random_mask_size, log_atac,
+                                 use_atac, use_seq, seed_val, atac_corrupt_rate,
+                                 validation_steps, use_motif_activity, g_val)
 
     val_data_ho = return_dataset(gcs_path_ho, "valid", global_batch_size, input_length,
                                  output_length_ATAC, output_length, crop_size,
@@ -578,13 +628,16 @@ def return_distributed_iterators(gcs_path, gcs_path_ho, global_batch_size,
     val_dist_ho=strategy.experimental_distribute_dataset(val_data_ho)
     val_data_ho_it = iter(val_dist_ho)
 
+    val_dist=strategy.experimental_distribute_dataset(val_data_ho)
+    val_data_it = iter(val_dist)
+
     #dist_iters_list=[]
     #for it in tr_iterators:
     tr_dist = strategy.experimental_distribute_dataset(tr_iterator)
     tr_data_it = iter(tr_dist)
     #    dist_iters_list.append(tr_data_it)
 
-    return tr_data_it, val_data_ho_it
+    return tr_data_it, val_data_it, val_data_ho_it
 
 def early_stopping(current_val_loss,
                    logged_val_losses,
@@ -647,6 +700,7 @@ def parse_args(parser):
     parser.add_argument('--gcs_path_holdout', help='google bucket containing holdout data')
     parser.add_argument('--num_parallel', type=int, default=multiprocessing.cpu_count(), help='thread count for tensorflow record loading')
     parser.add_argument('--batch_size', default=1, type=int, help='batch_size')
+    parser.add_argument('--val_examples', type=int, help='val_examples')
     parser.add_argument('--val_examples_ho', type=int, help='val_examples_ho')
     parser.add_argument('--patience', type=int, help='patience for early stopping')
     parser.add_argument('--min_delta', type=float, help='min_delta for early stopping')

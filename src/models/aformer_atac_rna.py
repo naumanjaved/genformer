@@ -236,6 +236,11 @@ class genformer(tf.keras.Model):
                                                 BN_momentum=self.BN_momentum,
                                                   **kwargs,
                                                   name = 'final_pointwise')
+        
+        self.final_pointwise_conv_rna = conv_block(filters=self.filter_list_seq[-1] // self.final_point_scale,
+                                            BN_momentum=self.BN_momentum,
+                                                **kwargs,
+                                                name = 'final_pointwise_rna')
 
         self.final_dense_profile = kl.Dense(1,
                                             activation='softplus',
@@ -283,14 +288,17 @@ class genformer(tf.keras.Model):
         transformer_input = self.pre_transformer_projection(transformer_input)
         out_performer,att_matrices = self.performer(transformer_input, training=training)
 
-        out = self.final_pointwise_conv(out_performer, training=training) ##
-        out = self.dropout(out, training=training) ## 0.05 default in tom's implementation
-        out = self.gelu(out)
-
-        out_atac = self.final_dense_profile(out, training=training)
+        out_atac = self.final_pointwise_conv(out_performer, training=training) ##
+        out_atac = self.dropout(out_atac, training=training) ## 0.05 default in tom's implementation
+        out_atac = self.gelu(out_atac)
+        out_atac = self.final_dense_profile(out_atac, training=training)
         out_atac = self.crop_final(out_atac) ## tom crops only on loss, tom will try cropping less
 
-        out_rna = self.final_dense_profile_rna(out, training=training)
+
+        out_rna = self.final_pointwise_conv_rna(out_performer, training=training)
+        out_rna = self.dropout(out_rna, training=training) ## 0.05 default in tom's implementation
+        out_rna = self.gelu(out_rna)
+        out_rna = self.final_dense_profile_rna(out_rna, training=training)
         out_rna = self.crop_final(out_rna) ## tom crops only on loss, tom will try cropping less
 
         return out_atac,out_rna
