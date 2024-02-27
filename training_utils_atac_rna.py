@@ -139,7 +139,6 @@ def return_train_val_functions(model, optimizers_in,
         output_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_atac, mask_indices), axis=0), axis=2)
         atac_loss = tf.reduce_mean(loss_fn(target_atac, output_atac)) * (1.0/num_replicas)
 
-
         rna_loss = tf.reduce_mean(loss_fn(target_rna, output_rna)) * (1.0/num_replicas)
 
         loss = atac_scale * atac_loss + rna_loss
@@ -276,7 +275,8 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
     rna = tf.ensure_shape(tf.io.parse_tensor(data['rna'], out_type=tf.float32), [output_length,1])
     rna = tf.cast(rna,dtype=tf.float32)
     rna = tf.slice(rna, [crop_size,0], [output_length-2*crop_size,-1]) # crop at the outset 
-    rna = tf.clip_by_value(rna, clip_value_min=0.0, clip_value_max=65500.0) # clip the targets
+    rna = tf.clip_by_value(rna, clip_value_min=0.0, clip_value_max=65500.0) + \
+            tf.math.abs(g.normal(rna.shape,mean=1.0e-02,stddev=1.0e-02,dtype=tf.float32))
 
     #atac = atac + tf.math.abs(g.normal(atac.shape,mean=1.0e-05,stddev=1.0e-05,dtype=tf.float32))
     # get peaks centers 
@@ -418,7 +418,8 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
     rna = tf.ensure_shape(tf.io.parse_tensor(data['rna'], out_type=tf.float32), [output_length,1])
     rna = tf.cast(rna,dtype=tf.float32)
     rna = tf.slice(rna, [crop_size,0], [output_length-2*crop_size,-1]) # crop at the outset
-    rna = tf.clip_by_value(rna, clip_value_min=0.0, clip_value_max=65500.0) # clip the targets
+    rna = tf.clip_by_value(rna, clip_value_min=0.0, clip_value_max=65500.0) + \
+            tf.math.abs(g_val.normal(rna.shape,mean=1.0e-02,stddev=1.0e-02,dtype=tf.float32))
 
     # tss tokens, cast to float32 
     tss_tokens = tf.ensure_shape(tf.io.parse_tensor(data['tss_tokens'], out_type=tf.int32), [output_length])
