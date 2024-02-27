@@ -462,7 +462,7 @@ def return_dataset(gcs_path, split, batch, input_length, output_length_ATAC,
             deterministic=False,
             num_parallel_calls=tf.data.AUTOTUNE)
 
-        return dataset.repeat(3).batch(batch).prefetch(tf.data.AUTOTUNE)
+        return dataset.repeat(2).batch(batch).prefetch(tf.data.AUTOTUNE)
 
     else:
         list_files = (tf.io.gfile.glob(os.path.join(gcs_path, split, wc)))
