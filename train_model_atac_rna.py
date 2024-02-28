@@ -157,13 +157,13 @@ def main():
         GLOBAL_BATCH_SIZE = BATCH_SIZE_PER_REPLICA*NUM_REPLICAS # num total examples per step across all replicas
         print('global batch size:', GLOBAL_BATCH_SIZE)
 
-        wandb.config.update({"train_steps": 1 + (34021 * 8 // (GLOBAL_BATCH_SIZE))},
+        wandb.config.update({"train_steps": 1 + (3402 * 8 // (GLOBAL_BATCH_SIZE))},
                             allow_val_change=True)
         wandb.config.update({"val_steps" : wandb.config.val_examples // GLOBAL_BATCH_SIZE},
                             allow_val_change=True)
         wandb.config.update({"val_steps_ho" : wandb.config.val_examples_ho // GLOBAL_BATCH_SIZE},
                             allow_val_change=True)
-        wandb.config.update({"total_steps": 1 + (34021 * 8 // GLOBAL_BATCH_SIZE)},
+        wandb.config.update({"total_steps": 1 + (3402 * 8 // GLOBAL_BATCH_SIZE)},
                             allow_val_change=True)
         # create the dataset iterators, one for training, one for holdout validation  
         train_human_it, data_val, data_val_ho = \
@@ -342,8 +342,10 @@ def main():
             train_loss = NUM_REPLICAS*metric_dict['train_loss'].result().numpy() #this is the per example loss * NUM_REPLICAS # multiply by NUM_REPLICAS to get total loss
             print('train_loss: ' + str(train_loss))
             print('train_loss_rna: ' + str(NUM_REPLICAS*metric_dict['train_loss_rna'].result().numpy()))
+            print('RNA_PearsonR_tr: ' + str(metric_dict['RNA_PearsonR_tr'].result()['PearsonR'].numpy()))
+            print('RNA_R2_tr: ' + str(metric_dict['RNA_R2_tr'].result()['R2'].numpy()))
 
-            wandb.log({'train_loss': NUM_REPLICAS*train_loss,
+            wandb.log({'train_loss': train_loss,
                        'train_loss_rna': NUM_REPLICAS*metric_dict['train_loss_rna'].result().numpy(),
                        'RNA_PearsonR_tr': metric_dict['RNA_PearsonR_tr'].result()['PearsonR'].numpy(),
                        'RNA_R2_tr': metric_dict['RNA_R2_tr'].result()['R2'].numpy()},
@@ -387,7 +389,6 @@ def main():
 
                 val_loss = NUM_REPLICAS * metric_dict['val_loss'].result().numpy() # multiply by NUM_REPLICAS to get total loss 
                 val_loss_rna = NUM_REPLICAS * metric_dict['val_loss_rna'].result().numpy() # multiply by NUM_REPLICAS to get total loss 
-                val_loss_atac = NUM_REPLICAS * metric_dict['val_loss_atac'].result().numpy() # multiply by NUM_REPLICAS to get total loss 
                 print('val_loss: ' + str(val_loss))
                 print('val_loss_rna: ' + str(val_loss_rna))
                 val_losses.append(val_loss)
@@ -401,6 +402,7 @@ def main():
                             'RNA_R2': metric_dict['RNA_R2'].result()['R2'].numpy()},
                             step=step_num)
                 if wandb.config.predict_atac:
+                    val_loss_atac = NUM_REPLICAS * metric_dict['val_loss_atac'].result().numpy() # multiply by NUM_REPLICAS to get total loss 
                     print('val_loss_atac: ' + str(val_loss_atac))
                     print('ATAC_pearsons: ' + str(metric_dict['ATAC_PearsonR'].result()['PearsonR'].numpy()))
                     print('ATAC_R2: ' + str(metric_dict['ATAC_R2'].result()['R2'].numpy()))
