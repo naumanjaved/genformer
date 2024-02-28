@@ -126,7 +126,8 @@ def main():
             'warmup_steps': float(args.warmup_steps),
             'return_constant_lr': parse_bool_str(args.return_constant_lr),
             'atac_scale': float(args.atac_scale),
-            'load_init_FT': parse_bool_str(args.load_init_FT)
+            'load_init_FT': parse_bool_str(args.load_init_FT),
+            'predict_atac': parse_bool_str(args.predict_atac)
     }
 
     wandb.init(config=config,
@@ -208,6 +209,7 @@ def main():
                                 final_point_scale=wandb.config.final_point_scale,
                                 filter_list_seq=wandb.config.filter_list_seq,
                                 filter_list_atac=wandb.config.filter_list_atac,
+                                predict_atac=wandb.config.predict_atac,
                                 use_rot_emb=wandb.config.use_rot_emb)
 
         print('initialized model')
@@ -261,7 +263,8 @@ def main():
                 num_replicas=NUM_REPLICAS,
                 loss_type=wandb.config.loss_type,
                 total_weight=wandb.config.total_weight_loss,
-                atac_scale=wandb.config.atac_scale
+                atac_scale=wandb.config.atac_scale,
+                predict_atac=wandb.config.predict_atac
             )
         
 
@@ -338,18 +341,19 @@ def main():
             print('lr2 at:' + str(optimizer2.lr.values[0]))
             train_loss = NUM_REPLICAS*metric_dict['train_loss'].result().numpy() #this is the per example loss * NUM_REPLICAS # multiply by NUM_REPLICAS to get total loss
             print('train_loss: ' + str(train_loss))
-            print('train_loss_atac: ' + str(NUM_REPLICAS*metric_dict['train_loss_atac'].result().numpy()))
             print('train_loss_rna: ' + str(NUM_REPLICAS*metric_dict['train_loss_rna'].result().numpy()))
 
             wandb.log({'train_loss': NUM_REPLICAS*train_loss,
-                       'train_loss_atac': NUM_REPLICAS*metric_dict['train_loss_atac'].result().numpy(),
-                       'train_loss_rna': NUM_REPLICAS*metric_dict['train_loss_rna'].result().numpy()},
+                       'train_loss_rna': NUM_REPLICAS*metric_dict['train_loss_rna'].result().numpy(),
+                       'RNA_PearsonR_tr': metric_dict['RNA_PearsonR_tr'].result()['PearsonR'].numpy(),
+                       'RNA_R2_tr': metric_dict['RNA_R2_tr'].result()['R2'].numpy()},
                         step=step_num)
-            wandb.log({'ATAC_PearsonR_tr': metric_dict['ATAC_PearsonR_tr'].result()['PearsonR'].numpy(),
-                        'ATAC_R2_tr': metric_dict['ATAC_R2_tr'].result()['R2'].numpy(),
-                        'RNA_PearsonR_tr': metric_dict['RNA_PearsonR_tr'].result()['PearsonR'].numpy(),
-                        'RNA_R2_tr': metric_dict['RNA_R2_tr'].result()['R2'].numpy()},
-                        step=step_num)
+            if wandb.config.predict_atac:
+                print('train_loss_atac: ' + str(NUM_REPLICAS*metric_dict['train_loss_atac'].result().numpy()))
+                wandb.log({'train_loss_atac': NUM_REPLICAS*metric_dict['train_loss_atac'].result().numpy(),
+                        'ATAC_PearsonR_tr': metric_dict['ATAC_PearsonR_tr'].result()['PearsonR'].numpy(),
+                        'ATAC_R2_tr': metric_dict['ATAC_R2_tr'].result()['R2'].numpy()},
+                            step=step_num)
 
             duration = (time.time() - start) / 60.
             print('completed epoch ' + str(1 + wandb.config.num_epochs_to_start + epoch_idx) + ' - duration(mins): ' + str(duration))
@@ -364,7 +368,7 @@ def main():
                 true_list = [] # list to store true values
                 cell_type_list = [] # list to store predictions
                 gene_list = [] # list to store true values
-                for k in range(wandb.config.val_steps_ho):
+                for k in range(wandb.config.val_steps):
                     true, pred,gene,cell_type = strategy.run(val_step, args=(next(data_val),))
                     for x in strategy.experimental_local_results(true): # flatten the true values
                         true_list.append(tf.reshape(x, [-1]))
@@ -386,23 +390,25 @@ def main():
                 val_loss_atac = NUM_REPLICAS * metric_dict['val_loss_atac'].result().numpy() # multiply by NUM_REPLICAS to get total loss 
                 print('val_loss: ' + str(val_loss))
                 print('val_loss_rna: ' + str(val_loss_rna))
-                print('val_loss_atac: ' + str(val_loss_atac))
                 val_losses.append(val_loss)
-                wandb.log({'val_loss': val_loss, 'val_loss_rna': val_loss_rna, 'val_loss_atac': val_loss_atac},
-                            step=step_num)
                 val_pearsons.append(metric_dict['RNA_PearsonR'].result()['PearsonR'].numpy())
-                print('ATAC_pearsons: ' + str(metric_dict['ATAC_PearsonR'].result()['PearsonR'].numpy()))
-                print('ATAC_R2: ' + str(metric_dict['ATAC_R2'].result()['R2'].numpy()))
                 print('RNA_pearsons: ' + str(metric_dict['RNA_PearsonR'].result()['PearsonR'].numpy()))
                 print('RNA_R2: ' + str(metric_dict['RNA_R2'].result()['R2'].numpy()))
                 print('cell_specific_correlation: ' + str(cell_specific_corrs))
                 print('gene_specific_correlation: ' + str(gene_specific_corrs))
-                wandb.log({'ATAC_pearsons': metric_dict['ATAC_PearsonR'].result()['PearsonR'].numpy(),
-                            'ATAC_R2': metric_dict['ATAC_R2'].result()['R2'].numpy(),
-                            'RNA_pearsons': metric_dict['RNA_PearsonR'].result()['PearsonR'].numpy(),
+                wandb.log({'val_loss': val_loss, 'val_loss_rna': val_loss_rna,
+                           'RNA_pearsons': metric_dict['RNA_PearsonR'].result()['PearsonR'].numpy(),
                             'RNA_R2': metric_dict['RNA_R2'].result()['R2'].numpy()},
                             step=step_num)
-            
+                if wandb.config.predict_atac:
+                    print('val_loss_atac: ' + str(val_loss_atac))
+                    print('ATAC_pearsons: ' + str(metric_dict['ATAC_PearsonR'].result()['PearsonR'].numpy()))
+                    print('ATAC_R2: ' + str(metric_dict['ATAC_R2'].result()['R2'].numpy()))
+
+                    wandb.log({'val_loss_atac': val_loss_atac,
+                            'ATAC_pearsons': metric_dict['ATAC_PearsonR'].result()['PearsonR'].numpy(),
+                            'ATAC_R2': metric_dict['ATAC_R2'].result()['R2'].numpy()},
+                                step=step_num)
 
             pred_list = [] # list to store predictions
             true_list = [] # list to store true values
@@ -423,29 +429,31 @@ def main():
                                                                 tf.concat(pred_list,0),
                                                                 tf.concat(cell_type_list,0),
                                                                 tf.concat(gene_list,0), 5000)
-            
             val_loss_ho = NUM_REPLICAS * metric_dict['val_loss_ho'].result().numpy() # multiply by NUM_REPLICAS to get total loss 
             val_loss_rna_ho = NUM_REPLICAS * metric_dict['val_loss_rna_ho'].result().numpy() # multiply by NUM_REPLICAS to get total loss 
-            val_loss_atac_ho = NUM_REPLICAS * metric_dict['val_loss_atac_ho'].result().numpy() # multiply by NUM_REPLICAS to get total loss 
             print('val_loss_ho: ' + str(val_loss_ho))
             print('val_loss_rna_ho: ' + str(val_loss_rna_ho))
-            print('val_loss_atac_ho: ' + str(val_loss_atac_ho))
-            val_losses.append(val_loss)
-            wandb.log({'val_loss_ho': val_loss_ho, 'val_loss_rna_ho': val_loss_rna_ho, 'val_loss_atac_ho': val_loss_atac_ho},
-                        step=step_num)
-            print('ATAC_pearsons_ho: ' + str(metric_dict['ATAC_PearsonR_ho'].result()['PearsonR'].numpy()))
-            print('ATAC_R2_ho: ' + str(metric_dict['ATAC_R2_ho'].result()['R2'].numpy()))
             print('RNA_pearsons_ho: ' + str(metric_dict['RNA_PearsonR_ho'].result()['PearsonR'].numpy()))
             print('RNA_R2_ho: ' + str(metric_dict['RNA_R2_ho'].result()['R2'].numpy()))
             print('cell_specific_correlation_ho: ' + str(cell_specific_corrs_ho))
             print('gene_specific_correlation_ho: ' + str(gene_specific_corrs_ho))
-            wandb.log({'ATAC_pearsons_ho': metric_dict['ATAC_PearsonR_ho'].result()['PearsonR'].numpy(),
-                        'ATAC_R2_ho': metric_dict['ATAC_R2_ho'].result()['R2'].numpy(),
-                        'RNA_pearsons_ho': metric_dict['RNA_PearsonR_ho'].result()['PearsonR'].numpy(),
+
+            wandb.log({'val_loss_ho': val_loss_ho, 'val_loss_rna_ho': val_loss_rna_ho, 
+                       'RNA_pearsons_ho': metric_dict['RNA_PearsonR_ho'].result()['PearsonR'].numpy(),
                         'RNA_R2_ho': metric_dict['RNA_R2_ho'].result()['R2'].numpy()},
                         step=step_num)
+            
+            if wandb.config.predict_atac:
+                val_loss_atac_ho = NUM_REPLICAS * metric_dict['val_loss_atac_ho'].result().numpy() # multiply by NUM_REPLICAS to get total loss 
 
-
+                print('val_loss_atac_ho: ' + str(val_loss_atac_ho))
+                print('ATAC_pearsons_ho: ' + str(metric_dict['ATAC_PearsonR_ho'].result()['PearsonR'].numpy()))
+                print('ATAC_R2_ho: ' + str(metric_dict['ATAC_R2_ho'].result()['R2'].numpy()))
+                wandb.log({'val_loss_atac_ho': val_loss_atac_ho,
+                            'ATAC_pearsons_ho': metric_dict['ATAC_PearsonR_ho'].result()['PearsonR'].numpy(),
+                            'ATAC_R2_ho': metric_dict['ATAC_R2_ho'].result()['R2'].numpy()},
+                            step=step_num)
+                
             duration = (time.time() - start) / 60.
             print('completed epoch ' + str(epoch_idx + 1 + wandb.config.num_epochs_to_start) + ' validation - duration(mins): ' + str(duration))
 

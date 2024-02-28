@@ -17,7 +17,7 @@ tf.keras.backend.set_floatx('float32')
 
 def return_train_val_functions(model, optimizers_in,
                                strategy, metric_dict, num_replicas,
-                               loss_type,total_weight=0.15,atac_scale=0.10):
+                               loss_type,total_weight=0.15,atac_scale=0.10,predict_atac=False):
     """Return training, validation, and build step functions
     Args:
         model: the input genformer model
@@ -32,22 +32,23 @@ def return_train_val_functions(model, optimizers_in,
 
     # initialize metrics
     metric_dict["train_loss"] = tf.keras.metrics.Mean("train_loss", dtype=tf.float32)
-    metric_dict["train_loss_atac"] = tf.keras.metrics.Mean("train_loss_atac",dtype=tf.float32)
+
+    if predict_atac:
+        metric_dict["train_loss_atac"] = tf.keras.metrics.Mean("train_loss_atac",dtype=tf.float32)
+        metric_dict["val_loss_atac"] = tf.keras.metrics.Mean("val_loss_atac",dtype=tf.float32)
+        metric_dict["val_loss_atac_ho"] = tf.keras.metrics.Mean("val_loss_atac_ho",dtype=tf.float32)
+        metric_dict['ATAC_PearsonR_tr'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
+        metric_dict['ATAC_R2_tr'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
+        metric_dict['ATAC_PearsonR'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
+        metric_dict['ATAC_R2'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
+        metric_dict['ATAC_PearsonR_ho'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
+        metric_dict['ATAC_R2_ho'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
+
     metric_dict["train_loss_rna"] = tf.keras.metrics.Mean("train_loss_rna",dtype=tf.float32)
     metric_dict["val_loss"] = tf.keras.metrics.Mean("val_loss",dtype=tf.float32)
-    metric_dict["val_loss_atac"] = tf.keras.metrics.Mean("val_loss_atac",dtype=tf.float32)
     metric_dict["val_loss_rna"] = tf.keras.metrics.Mean("val_loss_rna",dtype=tf.float32)
     metric_dict["val_loss_ho"] = tf.keras.metrics.Mean("val_loss_ho",dtype=tf.float32)
-    metric_dict["val_loss_atac_ho"] = tf.keras.metrics.Mean("val_loss_atac_ho",dtype=tf.float32)
     metric_dict["val_loss_rna_ho"] = tf.keras.metrics.Mean("val_loss_rna_ho",dtype=tf.float32)
-
-    metric_dict['ATAC_PearsonR_tr'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
-    metric_dict['ATAC_R2_tr'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
-    metric_dict['ATAC_PearsonR'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
-    metric_dict['ATAC_R2'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
-    metric_dict['ATAC_PearsonR_ho'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
-    metric_dict['ATAC_R2_ho'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
-
     metric_dict['RNA_PearsonR_tr'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
     metric_dict['RNA_R2_tr'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
     metric_dict['RNA_PearsonR'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
@@ -87,39 +88,52 @@ def return_train_val_functions(model, optimizers_in,
                                     model.motif_activity_fc2.trainable_variables + \
                                     model.performer.trainable_variables + \
                                     model.pre_transformer_projection.trainable_variables
-
-            output_heads = model.final_pointwise_conv.trainable_variables + \
-                                model.final_dense_profile.trainable_variables + \
-                                model.final_pointwise_conv_rna.trainable_variables + \
-                                model.final_dense_profile_rna.trainable_variables
+            if predict_atac:
+                output_heads = model.final_pointwise_conv.trainable_variables + \
+                                    model.final_dense_profile.trainable_variables + \
+                                    model.final_pointwise_conv_rna.trainable_variables + \
+                                    model.final_dense_profile_rna.trainable_variables
+            else:
+                output_heads = model.final_pointwise_conv_rna.trainable_variables + \
+                    model.final_dense_profile_rna.trainable_variables
 
             all_vars = base_weights + output_heads
 
-            output_atac,output_rna = model(input_tuple, training=True)
-            output_atac = tf.cast(output_atac,dtype=tf.float32)
-            output_rna = tf.cast(output_rna,dtype=tf.float32)
+            if predict_atac:
+                output_atac,output_rna = model(input_tuple, training=True)
+                output_atac = tf.cast(output_atac,dtype=tf.float32)
+                output_rna = tf.cast(output_rna,dtype=tf.float32)
+            else:
+                output_rna = model(input_tuple, training=True)
+                output_rna = tf.cast(output_rna,dtype=tf.float32)
 
-            #### atac loss
-            mask_indices = tf.where(mask == 1) # extract indices of masked bins
-            target_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(target_atac, mask_indices), axis=0), axis=2)
-            output_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_atac, mask_indices), axis=0), axis=2)
-            atac_loss = tf.reduce_mean(loss_fn(target_atac, output_atac)) * (1.0/num_replicas)
-
+            
             #### rna loss
             rna_loss = tf.reduce_mean(loss_fn(target_rna, output_rna)) * (1.0/num_replicas)
 
-            loss = atac_scale * atac_loss + rna_loss
+            if predict_atac:
+                #### atac loss
+                mask_indices = tf.where(mask == 1) # extract indices of masked bins
+                target_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(target_atac, mask_indices), axis=0), axis=2)
+                output_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_atac, mask_indices), axis=0), axis=2)
+                atac_loss = tf.reduce_mean(loss_fn(target_atac, output_atac)) * (1.0/num_replicas)
+                
+                loss = atac_scale * atac_loss + rna_loss
+            else:
+                loss=rna_loss
 
         gradients = tape.gradient(loss, all_vars)
         optimizer1.apply_gradients(zip(gradients[:len(base_weights)], base_weights))
         optimizer2.apply_gradients(zip(gradients[len(base_weights):], output_heads))
         metric_dict["train_loss"].update_state(loss)
         metric_dict["train_loss_rna"].update_state(rna_loss)
-        metric_dict["train_loss_atac"].update_state(atac_loss)
-        metric_dict['ATAC_PearsonR_tr'].update_state(target_atac, output_atac)
-        metric_dict['ATAC_R2_tr'].update_state(target_atac, output_atac)
         metric_dict['RNA_PearsonR_tr'].update_state(target_rna, output_rna)
         metric_dict['RNA_R2_tr'].update_state(target_rna, output_rna)
+        if predict_atac:
+            metric_dict["train_loss_atac"].update_state(atac_loss)
+            metric_dict['ATAC_PearsonR_tr'].update_state(target_atac, output_atac)
+            metric_dict['ATAC_R2_tr'].update_state(target_atac, output_atac)
+
 
     @tf.function(reduce_retracing=True)
     def dist_val_step(inputs):  # main validation step
@@ -129,25 +143,31 @@ def return_train_val_functions(model, optimizers_in,
         
         input_tuple = sequence,atac,motif_activity
 
-        output_atac,output_rna = model(input_tuple, training=False)
-        output_atac = tf.cast(output_atac,dtype=tf.float32)
-        output_rna = tf.cast(output_rna,dtype=tf.float32)
-
-        mask_indices = tf.where(mask == 1) # extract indices of masked bins
-        # subset target and predictions to masked bins
-        target_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(target_atac, mask_indices), axis=0), axis=2)
-        output_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_atac, mask_indices), axis=0), axis=2)
-        atac_loss = tf.reduce_mean(loss_fn(target_atac, output_atac)) * (1.0/num_replicas)
+        if predict_atac:
+            output_atac,output_rna = model(input_tuple, training=False)
+            output_atac = tf.cast(output_atac,dtype=tf.float32)
+            output_rna = tf.cast(output_rna,dtype=tf.float32)
+        else:
+            output_rna = model(input_tuple, training=False)
+            output_rna = tf.cast(output_rna,dtype=tf.float32)
 
         rna_loss = tf.reduce_mean(loss_fn(target_rna, output_rna)) * (1.0/num_replicas)
 
-        loss = atac_scale * atac_loss + rna_loss
+        if predict_atac:
+            mask_indices = tf.where(mask == 1) # extract indices of masked bins
+            # subset target and predictions to masked bins
+            target_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(target_atac, mask_indices), axis=0), axis=2)
+            output_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_atac, mask_indices), axis=0), axis=2)
+            atac_loss = tf.reduce_mean(loss_fn(target_atac, output_atac)) * (1.0/num_replicas)
+            loss = atac_scale * atac_loss + rna_loss
+            metric_dict["val_loss_atac"].update_state(atac_loss)
+            metric_dict['ATAC_PearsonR'].update_state(target_atac, output_atac)
+            metric_dict['ATAC_R2'].update_state(target_atac, output_atac)
+        else:
+            loss=rna_loss
 
         metric_dict["val_loss"].update_state(loss)
         metric_dict["val_loss_rna"].update_state(rna_loss)
-        metric_dict["val_loss_atac"].update_state(atac_loss)
-        metric_dict['ATAC_PearsonR'].update_state(target_atac, output_atac)
-        metric_dict['ATAC_R2'].update_state(target_atac, output_atac)
         metric_dict['RNA_PearsonR'].update_state(target_rna, output_rna)
         metric_dict['RNA_R2'].update_state(target_rna, output_rna)
 
@@ -164,25 +184,31 @@ def return_train_val_functions(model, optimizers_in,
         
         input_tuple = sequence,atac,motif_activity
 
-        output_atac,output_rna = model(input_tuple, training=False)
-        output_atac = tf.cast(output_atac,dtype=tf.float32)
-        output_rna = tf.cast(output_rna,dtype=tf.float32)
+        if predict_atac:
+            output_atac,output_rna = model(input_tuple, training=False)
+            output_atac = tf.cast(output_atac,dtype=tf.float32)
+            output_rna = tf.cast(output_rna,dtype=tf.float32)
+        else:
+            output_rna = model(input_tuple, training=False)
+            output_rna = tf.cast(output_rna,dtype=tf.float32)
 
-        mask_indices = tf.where(mask == 1) # extract indices of masked bins
-        # subset target and predictions to masked bins
-        target_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(target_atac, mask_indices), axis=0), axis=2)
-        output_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_atac, mask_indices), axis=0), axis=2)
-
-        atac_loss = tf.reduce_mean(loss_fn(target_atac, output_atac)) * (1.0/num_replicas)
         rna_loss = tf.reduce_mean(loss_fn(target_rna, output_rna)) * (1.0/num_replicas)
 
-        loss = atac_scale * atac_loss + rna_loss
+        if predict_atac:
+            mask_indices = tf.where(mask == 1) # extract indices of masked bins
+            # subset target and predictions to masked bins
+            target_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(target_atac, mask_indices), axis=0), axis=2)
+            output_atac = tf.expand_dims(tf.expand_dims(tf.gather_nd(output_atac, mask_indices), axis=0), axis=2)
+            atac_loss = tf.reduce_mean(loss_fn(target_atac, output_atac)) * (1.0/num_replicas)
+            loss = atac_scale * atac_loss + rna_loss
+            metric_dict["val_loss_atac_ho"].update_state(atac_loss)
+            metric_dict['ATAC_PearsonR_ho'].update_state(target_atac, output_atac)
+            metric_dict['ATAC_R2_ho'].update_state(target_atac, output_atac)
+        else:
+            loss=rna_loss
 
         metric_dict["val_loss_ho"].update_state(loss)
         metric_dict["val_loss_rna_ho"].update_state(rna_loss)
-        metric_dict["val_loss_atac_ho"].update_state(atac_loss)
-        metric_dict['ATAC_PearsonR_ho'].update_state(target_atac, output_atac)
-        metric_dict['ATAC_R2_ho'].update_state(target_atac, output_atac)
         metric_dict['RNA_PearsonR_ho'].update_state(target_rna, output_rna)
         metric_dict['RNA_R2_ho'].update_state(target_rna, output_rna)
 
@@ -275,9 +301,9 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
     rna = tf.ensure_shape(tf.io.parse_tensor(data['rna'], out_type=tf.float32), [output_length,1])
     rna = tf.cast(rna,dtype=tf.float32)
     rna = tf.slice(rna, [crop_size,0], [output_length-2*crop_size,-1]) # crop at the outset 
-    rna = tf.clip_by_value(rna, clip_value_min=0.0, clip_value_max=65500.0) + \
-            tf.math.abs(g.normal(rna.shape,mean=1.0e-02,stddev=1.0e-02,dtype=tf.float32))
-    rna = tf.math.pow(rna,0.75) # square root transform
+    diff = tf.math.sqrt(tf.nn.relu(rna - 5000.0 * tf.ones(rna.shape)))
+    rna = tf.clip_by_value(rna, clip_value_min=0.0, clip_value_max=5000.0) + diff + \
+                tf.math.abs(g.normal(rna.shape,mean=1.0e-02,stddev=1.0e-02,dtype=tf.float32))
 
     #atac = atac + tf.math.abs(g.normal(atac.shape,mean=1.0e-05,stddev=1.0e-05,dtype=tf.float32))
     # get peaks centers 
@@ -418,10 +444,10 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
     # rna output, cast to float32 
     rna = tf.ensure_shape(tf.io.parse_tensor(data['rna'], out_type=tf.float32), [output_length,1])
     rna = tf.cast(rna,dtype=tf.float32)
-    rna = tf.slice(rna, [crop_size,0], [output_length-2*crop_size,-1]) # crop at the outset
-    rna = tf.clip_by_value(rna, clip_value_min=0.0, clip_value_max=65500.0) + \
-            tf.math.abs(g_val.normal(rna.shape,mean=1.0e-02,stddev=1.0e-02,dtype=tf.float32))
-    rna = tf.math.pow(rna,0.75) # square root transform
+    rna = tf.slice(rna, [crop_size,0], [output_length-2*crop_size,-1]) # crop at the outset 
+    diff = tf.math.sqrt(tf.nn.relu(rna - 5000.0 * tf.ones(rna.shape)))
+    rna = tf.clip_by_value(rna, clip_value_min=0.0, clip_value_max=5000.0) + diff + \
+                tf.math.abs(g.normal(rna.shape,mean=1.0e-02,stddev=1.0e-02,dtype=tf.float32))
 
     # tss tokens, cast to float32 
     tss_tokens = tf.ensure_shape(tf.io.parse_tensor(data['tss_tokens'], out_type=tf.int32), [output_length])
@@ -762,6 +788,7 @@ def parse_args(parser):
     parser.add_argument('--return_constant_lr',type=str, default="False", help= 'return_constant_lr')
     parser.add_argument('--unmask_loss',type=str, default="False", help= 'return_constant_lr')
     parser.add_argument('--atac_scale', type=str, default="True", help= 'atac_scale for loss')
+    parser.add_argument('--predict_atac', type=str, default="True", help= 'predict_atac')
     args = parser.parse_args()
     return parser
 

@@ -59,4 +59,5 @@ python3 train_model_atac_rna.py \
             --decay_steps=500000 \
             --load_init_FT="False" \
             --load_init="False" \
-            --atac_scale="0.01" 
+            --atac_scale="0.01" \
+            --predict_atac="False"
