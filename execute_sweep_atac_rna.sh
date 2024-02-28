@@ -25,7 +25,7 @@ python3 train_model_atac_rna.py \
             --patience=50 \
             --output_res=128 \
             --min_delta=0.0000005 \
-            --model_save_dir="gs://$3/atac_pretrain/models" \
+            --model_save_dir="gs://$3/rampage_finetune/models" \
             --epsilon=1.0e-8 \
             --num_transformer_layers="10" \
             --dropout_rate="0.20" \
