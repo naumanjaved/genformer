@@ -301,8 +301,8 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
     rna = tf.ensure_shape(tf.io.parse_tensor(data['rna'], out_type=tf.float32), [output_length,1])
     rna = tf.cast(rna,dtype=tf.float32)
     rna = tf.slice(rna, [crop_size,0], [output_length-2*crop_size,-1]) # crop at the outset 
-    diff = tf.math.sqrt(tf.nn.relu(rna - 5000.0 * tf.ones(rna.shape)))
-    rna = tf.clip_by_value(rna, clip_value_min=0.0, clip_value_max=5000.0) + diff + \
+    diff = tf.math.sqrt(tf.nn.relu(rna - 500.0 * tf.ones(rna.shape)))
+    rna = tf.clip_by_value(rna, clip_value_min=0.0, clip_value_max=500.0) + diff + \
                 tf.math.abs(g.normal(rna.shape,mean=1.0e-02,stddev=1.0e-02,dtype=tf.float32))
 
     #atac = atac + tf.math.abs(g.normal(atac.shape,mean=1.0e-05,stddev=1.0e-05,dtype=tf.float32))
@@ -445,9 +445,9 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
     rna = tf.ensure_shape(tf.io.parse_tensor(data['rna'], out_type=tf.float32), [output_length,1])
     rna = tf.cast(rna,dtype=tf.float32)
     rna = tf.slice(rna, [crop_size,0], [output_length-2*crop_size,-1]) # crop at the outset 
-    diff = tf.math.sqrt(tf.nn.relu(rna - 5000.0 * tf.ones(rna.shape)))
-    rna = tf.clip_by_value(rna, clip_value_min=0.0, clip_value_max=5000.0) + diff + \
-                tf.math.abs(g.normal(rna.shape,mean=1.0e-02,stddev=1.0e-02,dtype=tf.float32))
+    diff = tf.math.sqrt(tf.nn.relu(rna - 500.0 * tf.ones(rna.shape)))
+    rna = tf.clip_by_value(rna, clip_value_min=0.0, clip_value_max=500.0) + diff + \
+                tf.math.abs(g_val.normal(rna.shape,mean=1.0e-02,stddev=1.0e-02,dtype=tf.float32))
 
     # tss tokens, cast to float32 
     tss_tokens = tf.ensure_shape(tf.io.parse_tensor(data['tss_tokens'], out_type=tf.int32), [output_length])
