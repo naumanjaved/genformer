@@ -34,6 +34,7 @@ class genformer(tf.keras.Model):
                  name: str = 'genformer',
                  load_init: bool=False,
                  inits=None,
+                 predict_atac=True,
                  **kwargs):
         """
         Genformer model takes as input sequence, masked ATAC seq, and TF 
@@ -94,6 +95,7 @@ class genformer(tf.keras.Model):
         self.num_motifs = num_motifs
         self.motif_units_fc = motif_units_fc
         self.motif_dropout_rate= motif_dropout_rate
+        self.predict_atac=predict_atac
 
         self.hidden_size=self.filter_list_seq[-1]# + self.filter_list_atac[-1] + (self.motif_units_fc//4)
         self.d_model = self.filter_list_seq[-1] #+ self.filter_list_atac[-1] + (self.motif_units_fc//4)
@@ -226,28 +228,27 @@ class genformer(tf.keras.Model):
                                              target_length=self.final_output_length,
                                              name='target_input')
 
-        self.final_pointwise_conv = conv_block(filters=self.filter_list_seq[-1] // self.final_point_scale,
-                                                beta_init=self.inits['final_point_BN_b'] if self.load_init else None,
-                                                gamma_init=self.inits['final_point_BN_g'] if self.load_init else None,
-                                                mean_init=self.inits['final_point_BN_m'] if self.load_init else None,
-                                                var_init=self.inits['final_point_BN_v'] if self.load_init else None,
-                                                k_init=self.inits['final_point_k'] if self.load_init else None,
-                                                b_init=self.inits['final_point_b'] if self.load_init else None,
-                                                BN_momentum=self.BN_momentum,
-                                                  **kwargs,
-                                                  name = 'final_pointwise')
+        if self.predict_atac:
+            self.final_pointwise_conv = conv_block(filters=self.filter_list_seq[-1] // self.final_point_scale,
+                                                    beta_init=self.inits['final_point_BN_b'] if self.load_init else None,
+                                                    gamma_init=self.inits['final_point_BN_g'] if self.load_init else None,
+                                                    mean_init=self.inits['final_point_BN_m'] if self.load_init else None,
+                                                    var_init=self.inits['final_point_BN_v'] if self.load_init else None,
+                                                    k_init=self.inits['final_point_k'] if self.load_init else None,
+                                                    b_init=self.inits['final_point_b'] if self.load_init else None,
+                                                    BN_momentum=self.BN_momentum,
+                                                    **kwargs,
+                                                    name = 'final_pointwise')
+            self.final_dense_profile = kl.Dense(1,
+                                                activation='softplus',
+                                                kernel_initializer=self.inits['final_dense_k'] if self.load_init else 'lecun_normal',
+                                                bias_initializer=self.inits['final_dense_b'] if self.load_init else 'zeros',
+                                                use_bias=True)
         
         self.final_pointwise_conv_rna = conv_block(filters=self.filter_list_seq[-1] // self.final_point_scale,
                                             BN_momentum=self.BN_momentum,
                                                 **kwargs,
                                                 name = 'final_pointwise_rna')
-
-        self.final_dense_profile = kl.Dense(1,
-                                            activation='softplus',
-                                            kernel_initializer=self.inits['final_dense_k'] if self.load_init else 'lecun_normal',
-                                            bias_initializer=self.inits['final_dense_b'] if self.load_init else 'zeros',
-                                            use_bias=True)
-
         self.final_dense_profile_rna = kl.Dense(1,
                                             activation='softplus',
                                             kernel_initializer='lecun_normal',
@@ -288,11 +289,12 @@ class genformer(tf.keras.Model):
         transformer_input = self.pre_transformer_projection(transformer_input)
         out_performer,att_matrices = self.performer(transformer_input, training=training)
 
-        out_atac = self.final_pointwise_conv(out_performer, training=training) ##
-        out_atac = self.dropout(out_atac, training=training) ## 0.05 default in tom's implementation
-        out_atac = self.gelu(out_atac)
-        out_atac = self.final_dense_profile(out_atac, training=training)
-        out_atac = self.crop_final(out_atac) ## tom crops only on loss, tom will try cropping less
+        if self.predict_atac:
+            out_atac = self.final_pointwise_conv(out_performer, training=training) ##
+            out_atac = self.dropout(out_atac, training=training) ## 0.05 default in tom's implementation
+            out_atac = self.gelu(out_atac)
+            out_atac = self.final_dense_profile(out_atac, training=training)
+            out_atac = self.crop_final(out_atac) ## tom crops only on loss, tom will try cropping less
 
 
         out_rna = self.final_pointwise_conv_rna(out_performer, training=training)
@@ -301,7 +303,10 @@ class genformer(tf.keras.Model):
         out_rna = self.final_dense_profile_rna(out_rna, training=training)
         out_rna = self.crop_final(out_rna) ## tom crops only on loss, tom will try cropping less
 
-        return out_atac,out_rna
+        if self.predict_atac:
+            return out_atac,out_rna
+        else:
+            return out_rna
 
     def get_config(self):
         config = {
