@@ -259,6 +259,7 @@ def deserialize_val(serialized_example,input_length=196608,max_shift=4, out_leng
     target = tf.slice(target,
                       [320,0],
                       [896,-1])
+    target = tf.math.pow(target,0.50)
     
     return {'sequence': tf.ensure_shape(sequence,
                                         [input_length,4]),
@@ -291,6 +292,7 @@ def deserialize_val_TSS(serialized_example,input_length=196608,max_shift=4, out_
     target = tf.slice(target,
                       [320,0],
                       [896,-1])
+    target = tf.math.pow(target,0.50)
     
     tss_mask = tf.io.parse_tensor(example['tss_mask'],
                                   out_type=tf.int32)
