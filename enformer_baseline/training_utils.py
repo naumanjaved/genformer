@@ -222,6 +222,7 @@ def deserialize_tr(serialized_example,input_length=196608,max_shift=4,
     target = tf.slice(target,
                       [320,0],
                       [896,-1])
+    target = tf.math.pow(target,0.50)
     
     if rev_comp == 1:
         sequence = tf.gather(sequence, [3, 2, 1, 0], axis=-1)
