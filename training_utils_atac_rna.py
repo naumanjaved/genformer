@@ -299,13 +299,12 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
 
     # rna output, cast to float32 
     rna = tf.ensure_shape(tf.io.parse_tensor(data['rna'], out_type=tf.float32), [output_length,1])
-    rna = tf.cast(rna,dtype=tf.float32)
     rna = tf.slice(rna, [crop_size,0], [output_length-2*crop_size,-1]) # crop at the outset
     rna = tf.math.pow(rna, 0.50)
     
     #atac = atac + tf.math.abs(g.normal(atac.shape,mean=1.0e-05,stddev=1.0e-05,dtype=tf.float32))
     # get peaks centers 
-    peaks_center = tf.expand_dims(tf.io.parse_tensor(data['peaks_center'], out_type=tf.int32), 
+    peaks_center = tf.expand_dims(tf.io.parse_tensor(data['peaks_center'], out_type=tf.int32),
                                   axis=1)
     peaks_c_crop = tf.slice(peaks_center, [crop_size,0], [output_length-2*crop_size,-1]) # crop at the outset 
     # TF activity, cast to float32 and expand dims to allow for processing by model input FC layers
@@ -441,8 +440,7 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
 
     # rna output, cast to float32 
     rna = tf.ensure_shape(tf.io.parse_tensor(data['rna'], out_type=tf.float32), [output_length,1])
-    rna = tf.cast(rna,dtype=tf.float32)
-    rna = tf.slice(rna, [crop_size,0], [output_length-2*crop_size,-1]) # crop at the outset 
+    rna = tf.slice(rna, [crop_size,0], [output_length-2*crop_size,-1]) # crop at the outset
     rna = tf.math.pow(rna, 0.50)
 
     # tss tokens, cast to float32 
@@ -629,7 +627,7 @@ def return_distributed_iterators(gcs_path, gcs_path_ho, global_batch_size,
                                  random_mask_size,
                                  log_atac, use_atac, use_seq, seed,seed_val,
                                  atac_corrupt_rate, 
-                                 validation_steps, use_motif_activity, g, g_val):
+                                 validation_steps, use_motif_activity, g, g_val,g_val_ho):
 
     tr_iterator = return_dataset(gcs_path, "train", global_batch_size, input_length,
                              output_length_ATAC, output_length, crop_size,
@@ -650,19 +648,16 @@ def return_distributed_iterators(gcs_path, gcs_path_ho, global_batch_size,
                                  output_res, max_shift, options_val, num_parallel_calls, num_epoch,
                                  atac_mask_dropout_val, random_mask_size, log_atac,
                                  use_atac, use_seq, seed_val, atac_corrupt_rate,
-                                 validation_steps, use_motif_activity, g_val)
+                                 validation_steps, use_motif_activity, g_val_ho)
 
     val_dist_ho=strategy.experimental_distribute_dataset(val_data_ho)
     val_data_ho_it = iter(val_dist_ho)
 
-    val_dist=strategy.experimental_distribute_dataset(val_data_ho)
+    val_dist=strategy.experimental_distribute_dataset(val_data)
     val_data_it = iter(val_dist)
 
-    #dist_iters_list=[]
-    #for it in tr_iterators:
     tr_dist = strategy.experimental_distribute_dataset(tr_iterator)
     tr_data_it = iter(tr_dist)
-    #    dist_iters_list.append(tr_data_it)
 
     return tr_data_it, val_data_it, val_data_ho_it
 

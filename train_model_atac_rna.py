@@ -56,6 +56,7 @@ def main():
     mixed_precision.set_global_policy('mixed_bfloat16')
     g = tf.random.Generator.from_seed(seed) # training data random seed init
     g_val = tf.random.Generator.from_seed(args.val_data_seed) # validation data random seed init
+    g_val_ho= tf.random.Generator.from_seed(args.val_data_seed) # holdout validation data random seed init
 
     mod_run_name = '_'.join([args.model_save_basename,
                                 str(args.input_length / 1000)[:4].rstrip('.') + 'k',
@@ -157,13 +158,13 @@ def main():
         GLOBAL_BATCH_SIZE = BATCH_SIZE_PER_REPLICA*NUM_REPLICAS # num total examples per step across all replicas
         print('global batch size:', GLOBAL_BATCH_SIZE)
 
-        wandb.config.update({"train_steps": 1 + (3402 * 8 // (GLOBAL_BATCH_SIZE))},
+        wandb.config.update({"train_steps": 1 + (34021 * 8 // (GLOBAL_BATCH_SIZE))},
                             allow_val_change=True)
         wandb.config.update({"val_steps" : wandb.config.val_examples // GLOBAL_BATCH_SIZE},
                             allow_val_change=True)
         wandb.config.update({"val_steps_ho" : wandb.config.val_examples_ho // GLOBAL_BATCH_SIZE},
                             allow_val_change=True)
-        wandb.config.update({"total_steps": 1 + (3402 * 8 // GLOBAL_BATCH_SIZE)},
+        wandb.config.update({"total_steps": 1 + (34021 * 8 // GLOBAL_BATCH_SIZE)},
                             allow_val_change=True)
         # create the dataset iterators, one for training, one for holdout validation  
         train_human_it, data_val, data_val_ho = \
@@ -178,7 +179,7 @@ def main():
                                                             wandb.config.use_atac, wandb.config.use_seq, wandb.config.seed,
                                                             wandb.config.val_data_seed, wandb.config.atac_corrupt_rate,
                                                             wandb.config.val_steps_ho, wandb.config.use_motif_activity,
-                                                            g, g_val)
+                                                            g, g_val,g_val_ho)
         
         #train_human_its_mult = train_human_its
 
