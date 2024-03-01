@@ -10,8 +10,6 @@ from functools import partial
 #from util import *
 import src.layers.util as util
 BIG_CONSTANT = 1e8
-tf.keras.mixed_precision.set_global_policy('mixed_bfloat16')
-
 
 def create_projection_matrix(m, d, seed=0, scaling=0, struct_mode=False):
     r"""Constructs the matrix of random projections.
@@ -165,6 +163,7 @@ def softmax_kernel_transformation(data,
     return data_dash
 
 
+'''
 def noncausal_numerator(qs, ks, vs):
     """Computes not-normalized FAVOR noncausal attention AV.
   Args:
@@ -176,8 +175,24 @@ def noncausal_numerator(qs, ks, vs):
     """
     kvs = tf.einsum("lbhm,lbhd->bhmd", ks, vs)
     return tf.einsum("lbhm,bhmd->lbhd", qs, kvs)
+'''
+def noncausal_numerator(qs, ks, vs):
+  """Computes not-normalized FAVOR+ noncausal attention AV.
 
+  Args:
+    qs: query_prime tensor of the shape [B...,L,H,M], where M stands for the
+      number of kernel features.
+    ks: key_prime tensor of the shape [B...,L,H,M], where M stands for the
+      number of kernel features.
+    vs: value tensor of the shape [B...,L,H,D].
 
+  Returns:
+    Not-normalized FAVOR+ noncausal attention AV.
+  """
+  kvs = tf.einsum('...lhm,...lhd->...hmd', ks, vs)
+  return tf.einsum('...lhm,...hmd->...lhd', qs, kvs)
+
+'''
 def noncausal_denominator(qs, ks):
     """Computes FAVOR normalizer in noncausal attention.
   Args:
@@ -186,9 +201,26 @@ def noncausal_denominator(qs, ks):
   Returns:
     FAVOR normalizer in noncausal attention.
     """
-    all_ones = tf.ones([ks.shape[0]], dtype=tf.bfloat16)
+    all_ones = tf.ones([ks.shape[0]])
     ks_sum = tf.einsum("lbhm,l->bhm", ks, all_ones)
     return tf.einsum("lbhm,bhm->lbh", qs, ks_sum)
+
+
+'''
+def noncausal_denominator(qs, ks):
+  """Computes FAVOR+ normalizer in noncausal attention AV.
+
+  Args:
+    qs: query_prime tensor of the shape [B...,L,H,M], where M stands for the
+      number of kernel features.
+    ks: key_prime tensor of the shape [B...,L,H,M], where M stands for the
+      number of kernel features.
+
+  Returns:
+    FAVOR+ normalizer in noncausal attention.
+  """
+  ks_sum = tf.math.reduce_sum(ks, axis=-3)
+  return tf.einsum('...lhm,...hm->...lh', qs, ks_sum)
 
 
 @tf.custom_gradient
@@ -305,9 +337,9 @@ def favor_attention(query,
     #print("qprime", query_prime)
     key_prime = kernel_transformation(key, False, projection_matrix)  # [B,L,H,M]
     #print("kprime", key_prime)
-    query_prime = tf.transpose(query_prime, [1, 0, 2, 3])  # [L,B,H,M]
-    key_prime = tf.transpose(key_prime, [1, 0, 2, 3])  # [L,B,H,M]
-    value = tf.transpose(value, [1, 0, 2, 3])  # [L,B,H,D]
+    #query_prime = tf.transpose(query_prime, [1, 0, 2, 3])  # [L,B,H,M]
+    #key_prime = tf.transpose(key_prime, [1, 0, 2, 3])  # [L,B,H,M]
+    #value = tf.transpose(value, [1, 0, 2, 3])  # [L,B,H,D]
 
     if causal:
         av_attention = causal_numerator(query_prime, key_prime, value)
@@ -317,13 +349,20 @@ def favor_attention(query,
         attention_normalizer = noncausal_denominator(query_prime, key_prime)
 
   # TODO(kchoro): Add more comments.
-    av_attention = tf.transpose(av_attention, [1, 0, 2, 3])
+    #av_attention = tf.transpose(av_attention, [1, 0, 2, 3])
     #print("avattn", av_attention.shape)
-    attention_normalizer = tf.transpose(attention_normalizer, [1, 0, 2])
+    
+    #attention_normalizer = tf.transpose(attention_normalizer, [1, 0, 2])
 
     attention_normalizer = tf.expand_dims(attention_normalizer,
                                         len(attention_normalizer.shape))
+    
+    attention_normalizer = tf.where(attention_normalizer <= 0.0,
+                                    tf.ones_like(attention_normalizer),
+                                    attention_normalizer)
+    
     return av_attention / attention_normalizer, key_prime, query_prime
+
 
 
 @tf.keras.utils.register_keras_serializable()
@@ -495,9 +534,9 @@ class Attention(tf.keras.layers.Layer):
         b, n, _ = query_input.shape
         h = self.num_heads
 
-        q = self.query_dense_layer(query_input)
-        k = self.key_dense_layer(source_input)
-        v = self.value_dense_layer(source_input)
+        q = tf.cast(self.query_dense_layer(query_input),dtype=tf.float32)
+        k = tf.cast(self.key_dense_layer(source_input),dtype=tf.float32)
+        v = tf.cast(self.value_dense_layer(source_input),dtype=tf.float32)
 
         if self.kernel_transformation == 'relu_kernel_transformation':
             kernel_transform = relu_kernel_transformation
@@ -520,6 +559,7 @@ class Attention(tf.keras.layers.Layer):
                                        projection_matrix)
 
         attention_output = self.output_dense_layer(attention_output)
+        attention_output = tf.cast(attention_output,dtype=tf.float32)
         return attention_output, k_prime, q_prime
 
 

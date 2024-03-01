@@ -464,6 +464,7 @@ class Performer_Encoder(kl.Layer):
 
     def call(self, x, training=None, **kwargs):
         att_matrices={}
+        x = tf.cast(x,dtype=tf.float32)
         for idx,layer in enumerate(self.layers):
             x,k_prime,q_prime = layer(x,
                                       sin=self.sin_rpe,
@@ -473,12 +474,11 @@ class Performer_Encoder(kl.Layer):
 
         if self.norm:
             x = self.layer_norm(x)
+        x = tf.cast(x,dtype=tf.bfloat16)
         return x,att_matrices
 
 
-def generate_fixed_pos_embedding(length, features, min_timescale=1.0, max_timescale=10000.0):
-    min_timescale = 1.0
-    max_timescale = 10000.0
+def generate_fixed_pos_embedding(length, features, min_timescale=1.0, max_timescale=8192.0):
     fraction = tf.range(start=0, limit=features, delta=2, dtype='float32') / tf.cast(features, 'float32')
     
     # Calculate the geometric progression of timescales
@@ -493,8 +493,8 @@ def generate_fixed_pos_embedding(length, features, min_timescale=1.0, max_timesc
 
     # Apply sin and cos to the scaled times, and then concatenate to get the final embeddings.
     sinusoid_inp = tf.concat([sinusoid_inp, sinusoid_inp], axis=-1)
-    output_sin = tf.cast(tf.sin(sinusoid_inp),dtype=tf.bfloat16)
-    output_cos = tf.cast(tf.cos(sinusoid_inp),dtype=tf.bfloat16)
+    output_sin = tf.cast(tf.sin(sinusoid_inp),dtype=tf.float32)
+    output_cos = tf.cast(tf.cos(sinusoid_inp),dtype=tf.float32)
 
     return output_sin, output_cos
 
