@@ -32,7 +32,7 @@ class genformer(tf.keras.Model):
                  final_point_scale: int = 2,
                  num_motifs: int = 693,
                  motif_dropout_rate: float = 0.15, # 
-                 motif_units_fc: int = 32,
+                 motif_units_fc: int = 128,
                  load_init: bool=False,
                  inits=None,
                  name: str = 'genformer',
@@ -160,7 +160,7 @@ class genformer(tf.keras.Model):
                                k_init=self.inits['conv1_k_' + str(i)] if self.load_init else None,
                                b_init=self.inits['conv1_b_' + str(i)] if self.load_init else None,
                                padding='same'),
-
+                #DoubleLayer(),
                 SoftmaxPooling1D(num_features=num_filters,
                                   kernel_init = self.inits[f'seq_pool{i}'],
                                   name=f'pool_k_{i}')],
@@ -182,7 +182,7 @@ class genformer(tf.keras.Model):
                                k_init=self.inits['conv_at1_k_' + str(i)] if self.load_init else None,
                                b_init=self.inits['conv_at1_b_' + str(i)] if self.load_init else None,
                                padding='same'),
-
+                #DoubleLayer(),
                 SoftmaxPooling1D(num_features=num_filters,
                                  kernel_init=self.inits['atac_pool' + str(i)],
                                  pool_size=4, 
@@ -221,14 +221,10 @@ class genformer(tf.keras.Model):
                                              target_length=self.final_output_length,
                                              name='target_input')
         
-        self.final_pointwise_conv = tf.keras.layers.Conv1D(
-                                    filters= self.filter_list_seq[-1] * self.final_point_scale,
-                                    kernel_size=1,
+        self.final_pointwise_dense = kl.Dense(self.filter_list_seq[-1] * self.final_point_scale,
                                     use_bias=True,
                                     kernel_initializer=self.inits['final_point_k'] if self.load_init else 'lecun_normal',
-                                    bias_initializer=self.inits['final_point_b'] if self.load_init else 'zeros',
-                                    strides=1,
-                                    padding='same')
+                                    bias_initializer=self.inits['final_point_b'] if self.load_init else 'zeros')
         self.final_dense_profile = kl.Dense(1,
                                             activation='softplus',
                                             kernel_initializer=self.inits['final_dense_k'] if self.load_init else 'lecun_normal',
@@ -238,6 +234,23 @@ class genformer(tf.keras.Model):
         self.dropout = kl.Dropout(rate=self.pointwise_dropout_rate,
                                   **kwargs)
         self.gelu = tfa.layers.GELU()
+        
+        self.motif_dropout1=kl.Dropout(rate=self.motif_dropout_rate, **kwargs)
+        self.motif_dropout2=kl.Dropout(rate=self.motif_dropout_rate, **kwargs)
+        # dense layer for motif activity
+        self.motif_activity_fc1 = kl.Dense(
+            self.motif_units_fc, # 128 
+            activation='gelu',
+            kernel_initializer=self.inits['motif_activity_fc1_k'] if self.load_init else 'lecun_normal',
+            bias_initializer=self.inits['motif_activity_fc1_b'] if self.load_init else 'zeros',
+            use_bias=True)
+
+        self.motif_activity_fc2 = kl.Dense(
+            self.motif_units_fc,
+            activation=None,
+            kernel_initializer=self.inits['motif_activity_fc2_k'] if self.load_init else 'lecun_normal',
+            bias_initializer=self.inits['motif_activity_fc2_b'] if self.load_init else 'zeros',
+            use_bias=True)
 
 
     def call(self, inputs, training:bool=True):
@@ -253,11 +266,17 @@ class genformer(tf.keras.Model):
         atac = self.stem_res_conv_atac(atac, training=training)
         atac = self.stem_pool_atac(atac, training=training)
         atac = self.conv_tower_atac(atac,training=training)
+        
+        motif_activity = self.motif_activity_fc1(motif_activity)
+        motif_activity = self.motif_dropout1(motif_activity,training=training)
+        motif_activity = self.motif_activity_fc2(motif_activity)
+        motif_activity = self.motif_dropout2(motif_activity,training=training)
+        motif_activity = tf.tile(motif_activity, [1, self.output_length, 1])
 
-        out = tf.concat([sequence,atac], axis=2) # append processed seq,atac,motif inputs in channel dim.
+        out = tf.concat([sequence,atac,motif_activity], axis=2) # append processed seq,atac,motif inputs in channel dim.
         out = self.pre_att_proj(out)
         out,att_matrices = self.performer(out, training=training)
-        out = self.final_pointwise_conv(out, training=training)
+        out = self.final_pointwise_dense(out, training=training)
         out = self.dropout(out, training=training)
         out = self.gelu(out)
         out = self.final_dense_profile(out, training=training)
@@ -324,9 +343,47 @@ class genformer(tf.keras.Model):
         out = tf.concat([sequence,atac], axis=2) # append processed seq,atac,motif inputs in channel dim.
         out = self.pre_att_proj(out)
         out,att_matrices = self.performer(out, training=training)
-        out = self.final_pointwise_conv(out, training=training)
+        out = self.final_pointwise_dense(out, training=training)
         out = self.dropout(out, training=training)
         out = self.gelu(out)
         out = self.final_dense_profile(out, training=training)
         out = self.crop_final(out)
         return out
+        
+        return out,att_matrices
+
+    
+    
+"""
+Residual(conv_block(filters=num_filters,
+               width=5,
+               stride=1,
+               BN_momentum=self.BN_momentum,
+               beta_init=self.inits['BN1_b_r_' + str(i)] if self.load_init else None,
+               gamma_init=self.inits['BN1_g_r_' + str(i)] if self.load_init else None,
+               mean_init=self.inits['BN1_m_r_' + str(i)] if self.load_init else None,
+               var_init=self.inits['BN1_v_r_' + str(i)] if self.load_init else None,
+               k_init=self.inits['conv1_k_r_' + str(i)] if self.load_init else None,
+               b_init=self.inits['conv1_b_r_' + str(i)] if self.load_init else None,
+               padding='same')),
+
+
+#SoftmaxPooling1D(num_features=num_filters,
+#                 kernel_init = self.inits['seq_pool' + str(i)],
+#                name=f'soft_max_pool_{i}')],
+
+"""
+
+"""
+Residual(conv_block(filters=num_filters,
+               width=5,
+               stride=1,
+               BN_momentum=self.BN_momentum,
+               beta_init=self.inits['BN_at1_b_r_' + str(i)] if self.load_init else None,
+               gamma_init=self.inits['BN_at1_g_r_' + str(i)] if self.load_init else None,
+               mean_init=self.inits['BN_at1_m_r_' + str(i)] if self.load_init else None,
+               var_init=self.inits['BN_at1_v_r_' + str(i)] if self.load_init else None,
+               k_init=self.inits['conv_at1_k_r_' + str(i)] if self.load_init else None,
+               b_init=self.inits['conv_at1_b_r_' + str(i)] if self.load_init else None,
+               padding='same')),
+"""

@@ -21,6 +21,16 @@ from jax import lax
 from jax import numpy as jnp
 
 @tf.keras.utils.register_keras_serializable()
+class DoubleLayer(kl.Layer):
+    def __init__(self, name='double_layer', **kwargs):
+        super().__init__(name=name,**kwargs)
+
+    def call(self, inputs,**kwargs):
+        return inputs * 2
+    
+    
+
+@tf.keras.utils.register_keras_serializable()
 class SoftmaxPooling1D(kl.Layer):
     """Softmax pooling layer."""
     def __init__(self,num_features,kernel_init=None,
