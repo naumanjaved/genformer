@@ -183,12 +183,6 @@ def main():
         
         #train_human_its_mult = train_human_its
 
-
-        inits=None
-        if wandb.config.load_init_FT:
-            print('loading fine-tuning weights')
-            inits=load_weights_atac_rna.get_initializers_genformer_ft(wandb.config.checkpoint_path_FT)
-
         print('created dataset iterators')
         # initialize model
         model = genformer.genformer(kernel_transformation=wandb.config.kernel_transformation,
@@ -214,6 +208,12 @@ def main():
                                 use_rot_emb=wandb.config.use_rot_emb)
 
         print('initialized model')
+
+        inits=None
+        if wandb.config.load_init_FT:
+            print('loading fine-tuning weights')
+            inits=load_weights_atac_rna.get_initializers_genformer_ft(wandb.config.checkpoint_path_FT)
+
 
         # initialize optimizer with warmup and cosine decay
         init_learning_rate=1.0e-07
@@ -400,7 +400,9 @@ def main():
                 print('gene_specific_correlation: ' + str(gene_specific_corrs))
                 wandb.log({'val_loss': val_loss, 'val_loss_rna': val_loss_rna,
                            'RNA_pearsons': metric_dict['RNA_PearsonR'].result()['PearsonR'].numpy(),
-                            'RNA_R2': metric_dict['RNA_R2'].result()['R2'].numpy()},
+                            'RNA_R2': metric_dict['RNA_R2'].result()['R2'].numpy(),
+                           'cell_specific_correlation': cell_specific_corrs,
+                            'gene_specific_correlation': gene_specific_corrs},
                             step=step_num)
                 if wandb.config.predict_atac:
                     val_loss_atac = NUM_REPLICAS * metric_dict['val_loss_atac'].result().numpy() # multiply by NUM_REPLICAS to get total loss 
@@ -443,7 +445,9 @@ def main():
 
             wandb.log({'val_loss_ho': val_loss_ho, 'val_loss_rna_ho': val_loss_rna_ho, 
                        'RNA_pearsons_ho': metric_dict['RNA_PearsonR_ho'].result()['PearsonR'].numpy(),
-                        'RNA_R2_ho': metric_dict['RNA_R2_ho'].result()['R2'].numpy()},
+                        'RNA_R2_ho': metric_dict['RNA_R2_ho'].result()['R2'].numpy(),
+                        'cell_specific_corrs_ho': cell_specific_corrs_ho,
+                        'gene_specific_corrs_ho': gene_specific_corrs_ho},
                         step=step_num)
             
             if wandb.config.predict_atac:
