@@ -40,8 +40,8 @@ def main():
         filter_list_seq = input_ckpt.split('_')[-10:-4]
         filter_list_seq[0] = filter_list_seq[0].split('-')[1]
         filter_list_seq = ','.join(filter_list_seq)
-        lr_base1 = '-'.join(input_ckpt.split('_')[-12].split('-')[1:])
-        lr_base2 = '-'.join(input_ckpt.split('_')[-11].split('-')[1:])
+        lr_base1 = '-'.join(input_ckpt.split('_')[-11].split('-')[1:])
+        lr_base2 = '-'.join(input_ckpt.split('_')[-10].split('-')[1:])
     else:
         seed = args.seed
         run_id = args.run_id
@@ -183,6 +183,12 @@ def main():
         
         #train_human_its_mult = train_human_its
 
+
+        inits=None
+        if wandb.config.load_init_FT:
+            print('loading fine-tuning weights')
+            inits=load_weights_atac_rna.get_initializers_genformer_ft(wandb.config.checkpoint_path_FT)
+
         print('created dataset iterators')
         # initialize model
         model = genformer.genformer(kernel_transformation=wandb.config.kernel_transformation,
@@ -208,12 +214,6 @@ def main():
                                 use_rot_emb=wandb.config.use_rot_emb)
 
         print('initialized model')
-
-        inits=None
-        if wandb.config.load_init_FT:
-            print('loading fine-tuning weights')
-            inits=load_weights_atac_rna.get_initializers_genformer_ft(wandb.config.checkpoint_path_FT)
-
 
         # initialize optimizer with warmup and cosine decay
         init_learning_rate=1.0e-07
