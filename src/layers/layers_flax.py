@@ -150,13 +150,13 @@ class Residual(kl.Layer):
 @tf.keras.utils.register_keras_serializable()
 class FFN(kl.Layer):
     def __init__(self,
-                 num_channels: int,
-                 dropout_rate: float,
-                   FFN_LN_gamma_init=None,
-                   FFN_kernel1_init=None,
-                   FFN_bias1_init=None,
-                   FFN_kernel2_init=None,
-                   FFN_bias2_init=None,
+                   FFN_LN_gamma_init,
+                   FFN_kernel1_init,
+                   FFN_bias1_init,
+                   FFN_kernel2_init,
+                   FFN_bias2_init,
+                     num_channels: int,
+                     dropout_rate: float,
                    load_init = True,
                  name: str = 'FFN',
                  **kwargs):
@@ -179,7 +179,7 @@ class FFN(kl.Layer):
         self.FFN_kernel2_init=FFN_kernel2_init
         self.FFN_bias2_init=FFN_bias2_init
 
-        self.FFN_layer_norm = T5LayerNorm(gamma_initializer=FFN_LN_gamma_init)
+        self.FFN_layer_norm = T5LayerNorm(gamma_initializer=self.FFN_LN_gamma_init)
         #kl.LayerNormalization(axis=-1,
                                                     #scale=True,
                                                     #epsilon=1e-06,
@@ -232,6 +232,21 @@ class Performer(kl.Layer):
     def __init__(self,
                  d_model,
                  normalize,
+                 LN_gamma_init,
+                 q_init_k,
+                 k_init_k,
+                 v_init_k,
+                 att_output_k,
+                 q_init_b,
+                 k_init_b,
+                 v_init_b,
+                 att_output_b,
+                 FFN_LN_gamma_init,
+                 FFN_kernel1_init,
+                 FFN_bias1_init,
+                 FFN_kernel2_init,
+                 FFN_bias2_init,
+                 load_init,
                  hidden_size: int,
                  num_heads: int,
                  seed: int,
@@ -240,21 +255,6 @@ class Performer(kl.Layer):
                  max_seq_length: int,
                  kernel_transformation: str = 'relu_kernel_transformation',
                  use_rot_emb: bool = True,
-                 LN_gamma_init = None,
-                 q_init_k=None,
-                 k_init_k=None,
-                 v_init_k=None,
-                 att_output_k=None,
-                 q_init_b=None,
-                 k_init_b=None,
-                 v_init_b=None,
-                 att_output_b=None,
-                 FFN_LN_gamma_init=None,
-                 FFN_kernel1_init=None,
-                 FFN_bias1_init=None,
-                 FFN_kernel2_init=None,
-                 FFN_bias2_init=None,
-                 load_init: bool = False,
                  name = 'transformer_layer',
                  **kwargs):
         super().__init__(name=name, **kwargs)
@@ -282,20 +282,15 @@ class Performer(kl.Layer):
         self.normalize=normalize
         self.seed=seed
         self.load_init=load_init
-        self.FFN_LN_gamma_init=None,
+        self.LN_gamma_init=LN_gamma_init
+        self.FFN_LN_gamma_init=FFN_LN_gamma_init,
         self.FFN_kernel1_init=FFN_kernel1_init
         self.FFN_bias1_init=FFN_bias1_init
         self.FFN_kernel2_init=FFN_kernel2_init
         self.FFN_bias2_init=FFN_bias2_init
 
-        self.layer_norm = T5LayerNorm(gamma_initializer=LN_gamma_init)
+        self.layer_norm = T5LayerNorm(gamma_initializer=self.LN_gamma_init)
         
-        #kl.LayerNormalization(axis=-1,
-                                                  #scale=True,
-                                                #center=False
-                                                  #epsilon=1.0e-06,
-                                                  #gamma_initializer=LN_gamma_init if LN_gamma_init is self.load_init else "ones")
-
 
         self.self_attention = fa_rpe.Attention(hidden_size=self.d_model,
                                                num_heads=self.num_heads,
@@ -317,11 +312,11 @@ class Performer(kl.Layer):
         self.dropout = kl.Dropout(rate=self.dropout_rate,**kwargs)
         self.FFN = FFN(num_channels=self.hidden_size,
                        dropout_rate=self.dropout_rate,
-                       FFN_LN_gamma_init=FFN_LN_gamma_init,
-                       FFN_kernel1_init=FFN_kernel1_init,
-                       FFN_bias1_init=FFN_bias1_init,
-                       FFN_kernel2_init=FFN_kernel2_init,
-                       FFN_bias2_init=FFN_bias2_init,
+                       FFN_LN_gamma_init=self.FFN_LN_gamma_init,
+                       FFN_kernel1_init=self.FFN_kernel1_init,
+                       FFN_bias1_init=self.FFN_bias1_init,
+                       FFN_kernel2_init=self.FFN_kernel2_init,
+                       FFN_bias2_init=self.FFN_bias2_init,
                        load_init = self.load_init,
                        name='FFN',
                        **kwargs)
@@ -375,14 +370,14 @@ class Performer_Encoder(kl.Layer):
                  max_seq_length,
                  hidden_size,
                  numerical_stabilizer,
+                 load_init,
+                 inits,
+                 kernel_transformation,
                  dropout_rate = 0.40,
                  use_rot_emb=True,
                  normalize=True,
                  norm=True,
                  seed=42,
-                 load_init=True,
-                 inits=None,
-                 kernel_transformation: str = 'relu_kernel_transformation',
                  name = 'performer_stack',
                  **kwargs):
 
@@ -428,20 +423,20 @@ class Performer_Encoder(kl.Layer):
                                  seed=self.seed, # use whatever 
                                  use_rot_emb=self.use_rot_emb, # True
                                  load_init=self.load_init,
-                                 LN_gamma_init = inits["LN_g" + str(i)] if self.load_init else None,
-                                 q_init_k= inits["SA_q_k" + str(i)] if self.load_init else None,
-                                 k_init_k= inits["SA_k_k" + str(i)] if self.load_init else None,
-                                 v_init_k= inits["SA_v_k" + str(i)] if self.load_init else None,
-                                 q_init_b= inits["SA_q_b" + str(i)] if self.load_init else None,
-                                 k_init_b= inits["SA_k_b" + str(i)] if self.load_init else None,
-                                 v_init_b= inits["SA_v_b" + str(i)] if self.load_init else None,
-                                 att_output_k= inits["SA_O_k" + str(i)] if self.load_init else None,
-                                 att_output_b= inits["SA_O_b" + str(i)] if self.load_init else None,
-                                 FFN_LN_gamma_init= inits["FFN_LN_g" + str(i)] if self.load_init else None,
-                                 FFN_kernel1_init= inits["FFN_wide_k" + str(i)] if self.load_init else None,
-                                 FFN_bias1_init= inits["FFN_wide_b" + str(i)] if self.load_init else None,
-                                 FFN_kernel2_init= inits["FFN_narr_k" + str(i)] if self.load_init else None,
-                                 FFN_bias2_init= inits["FFN_narr_b" + str(i)] if self.load_init else None,
+                                 LN_gamma_init = inits["LN_g" + str(i)],
+                                 q_init_k= inits["SA_q_k" + str(i)],
+                                 k_init_k= inits["SA_k_k" + str(i)],
+                                 v_init_k= inits["SA_v_k" + str(i)],
+                                 q_init_b= inits["SA_q_b" + str(i)],
+                                 k_init_b= inits["SA_k_b" + str(i)],
+                                 v_init_b= inits["SA_v_b" + str(i)],
+                                 att_output_k= inits["SA_O_k" + str(i)],
+                                 att_output_b= inits["SA_O_b" + str(i)],
+                                 FFN_LN_gamma_init= inits["FFN_LN_g" + str(i)],
+                                 FFN_kernel1_init= inits["FFN_wide_k" + str(i)],
+                                 FFN_bias1_init= inits["FFN_wide_b" + str(i)],
+                                 FFN_kernel2_init= inits["FFN_narr_k" + str(i)],
+                                 FFN_bias2_init= inits["FFN_narr_b" + str(i)],
                                  **kwargs) for i in range(self.num_layers)]
 
 
@@ -481,6 +476,7 @@ class Performer_Encoder(kl.Layer):
         att_matrices={}
         x = tf.cast(x,dtype=tf.float32)
         for idx,layer in enumerate(self.layers):
+            print('in layer ' + str(idx))
             x,k_prime,q_prime = layer(x,
                                       sin=self.sin_rpe,
                                       cos=self.cos_rpe,
@@ -488,6 +484,7 @@ class Performer_Encoder(kl.Layer):
             att_matrices['layer_' + str(idx)] = (k_prime,q_prime)
 
         if self.norm:
+            print('in final norm')
             x = self.layer_norm(x)
         return x,att_matrices
 
@@ -546,9 +543,13 @@ class T5LayerNorm(tf.keras.layers.Layer):
         super(T5LayerNorm, self).__init__(**kwargs)
         self.eps = eps
         self.gamma_initializer = gamma_initializer
+        if self.gamma_initializer is None:
+            raise NotImplementedError
+        else:
+            print("gamma_initializer:", self.gamma_initializer, type(self.gamma_initializer))
+        
         
     def build(self, input_shape):
-        # Use the initializer here
         self.gamma = self.add_weight(
             shape=(input_shape[-1],),
             initializer=self.gamma_initializer,
