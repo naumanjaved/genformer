@@ -27,8 +27,7 @@ class DoubleLayer(kl.Layer):
 
     def call(self, inputs,**kwargs):
         return inputs * 2
-    
-    
+
 
 @tf.keras.utils.register_keras_serializable()
 class SoftmaxPooling1D(kl.Layer):
@@ -180,10 +179,11 @@ class FFN(kl.Layer):
         self.FFN_kernel2_init=FFN_kernel2_init
         self.FFN_bias2_init=FFN_bias2_init
 
-        self.FFN_layer_norm = kl.LayerNormalization(axis=-1,
-                                                    scale=True,
-                                                    epsilon=1e-05,
-                                                    gamma_initializer=FFN_LN_gamma_init if self.load_init else "ones") ## add 1 
+        self.FFN_layer_norm = T5LayerNorm(gamma_initializer=FFN_LN_gamma_init)
+        #kl.LayerNormalization(axis=-1,
+                                                    #scale=True,
+                                                    #epsilon=1e-06,
+                                                    #gamma_initializer=FFN_LN_gamma_init if self.load_init else "ones") ## add 1 
         
         self.FFN_dense_wide = kl.Dense(self.ffn_channels*self.ffn_widening,
                                        activation='linear',
@@ -288,10 +288,13 @@ class Performer(kl.Layer):
         self.FFN_kernel2_init=FFN_kernel2_init
         self.FFN_bias2_init=FFN_bias2_init
 
-        self.layer_norm = kl.LayerNormalization(axis=-1,
-                                                  scale=True,
-                                                  epsilon=1.0e-05,
-                                                  gamma_initializer=LN_gamma_init if LN_gamma_init is self.load_init else "ones")
+        self.layer_norm = T5LayerNorm(gamma_initializer=LN_gamma_init)
+        
+        #kl.LayerNormalization(axis=-1,
+                                                  #scale=True,
+                                                #center=False
+                                                  #epsilon=1.0e-06,
+                                                  #gamma_initializer=LN_gamma_init if LN_gamma_init is self.load_init else "ones")
 
 
         self.self_attention = fa_rpe.Attention(hidden_size=self.d_model,
@@ -355,7 +358,7 @@ class Performer(kl.Layer):
                                                   sin=sin,
                                                   cos=cos,
                                                   **kwargs)
-
+        x = tf.cast(x,dtype=tf.bfloat16)
         x = self.dropout(x, training=training) ## 0.40
 
         mha_output = x + inputs
@@ -442,10 +445,12 @@ class Performer_Encoder(kl.Layer):
                                  **kwargs) for i in range(self.num_layers)]
 
 
-        self.layer_norm = kl.LayerNormalization(axis=-1,
-                                                scale=True,
-                                                epsilon=1.0e-05,
-                                                gamma_initializer=self.inits["performer_encoder_LN_g"] if self.load_init else "ones")
+        self.layer_norm = T5LayerNorm(gamma_initializer=inits["performer_encoder_LN_g"])
+        
+        #kl.LayerNormalization(axis=-1,
+                                                #scale=True,
+                                                #epsilon=1.0e-05,
+                                                #gamma_initializer=self.inits["performer_encoder_LN_g"] if self.load_init else "ones")
         
         self.sin_rpe,self.cos_rpe = generate_fixed_pos_embedding(self.max_seq_length, self.dim)
         
@@ -484,7 +489,6 @@ class Performer_Encoder(kl.Layer):
 
         if self.norm:
             x = self.layer_norm(x)
-        x = tf.cast(x,dtype=tf.bfloat16)
         return x,att_matrices
 
 
@@ -532,3 +536,32 @@ class TargetLengthCrop1D(kl.Layer):
         else:
             return inputs[..., trim:-trim, :]
 
+
+        
+class T5LayerNorm(tf.keras.layers.Layer):
+    def __init__(self, gamma_initializer, eps=1.0e-6, **kwargs):
+        """
+        Construct a layernorm module in the T5 style. No bias and no subtraction of mean.
+        """
+        super(T5LayerNorm, self).__init__(**kwargs)
+        self.eps = eps
+        self.gamma_initializer = gamma_initializer
+        
+    def build(self, input_shape):
+        # Use the initializer here
+        self.gamma = self.add_weight(
+            shape=(input_shape[-1],),
+            initializer=self.gamma_initializer,
+            name='gamma',
+            trainable=False
+        )
+
+    def call(self, x):
+        original_dtype = x.dtype
+        # Layer norm should always be calculated in float32
+        x = tf.cast(x, dtype=tf.float32)
+        variance = tf.math.reduce_mean(tf.math.square(tf.cast(x, tf.float32)), axis=-1, keepdims=True)
+        x_normalized = x / tf.math.sqrt(variance + self.eps)
+
+        output = tf.cast(self.gamma,dtype=tf.float32) * x_normalized
+        return tf.cast(output, original_dtype)
