@@ -173,7 +173,7 @@ class FFN(kl.Layer):
         self.ffn_widening = 2
         self.ffn_dropout = dropout_rate
         self.load_init=load_init
-        self.FFN_LN_gamma_init=FFN_LN_gamma_init,
+        self.FFN_LN_gamma_init=FFN_LN_gamma_init
         self.FFN_kernel1_init=FFN_kernel1_init
         self.FFN_bias1_init=FFN_bias1_init
         self.FFN_kernel2_init=FFN_kernel2_init
@@ -283,7 +283,7 @@ class Performer(kl.Layer):
         self.seed=seed
         self.load_init=load_init
         self.LN_gamma_init=LN_gamma_init
-        self.FFN_LN_gamma_init=FFN_LN_gamma_init,
+        self.FFN_LN_gamma_init=FFN_LN_gamma_init
         self.FFN_kernel1_init=FFN_kernel1_init
         self.FFN_bias1_init=FFN_bias1_init
         self.FFN_kernel2_init=FFN_kernel2_init
@@ -476,7 +476,6 @@ class Performer_Encoder(kl.Layer):
         att_matrices={}
         x = tf.cast(x,dtype=tf.float32)
         for idx,layer in enumerate(self.layers):
-            print('in layer ' + str(idx))
             x,k_prime,q_prime = layer(x,
                                       sin=self.sin_rpe,
                                       cos=self.cos_rpe,
@@ -484,7 +483,6 @@ class Performer_Encoder(kl.Layer):
             att_matrices['layer_' + str(idx)] = (k_prime,q_prime)
 
         if self.norm:
-            print('in final norm')
             x = self.layer_norm(x)
         return x,att_matrices
 
@@ -545,8 +543,6 @@ class T5LayerNorm(tf.keras.layers.Layer):
         self.gamma_initializer = gamma_initializer
         if self.gamma_initializer is None:
             raise NotImplementedError
-        else:
-            print("gamma_initializer:", self.gamma_initializer, type(self.gamma_initializer))
         
         
     def build(self, input_shape):
