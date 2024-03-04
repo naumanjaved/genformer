@@ -136,7 +136,6 @@ def main():
                                                             1536,
                                                             args.num_targets,
                                                             args.num_parallel,
-                                                            args.num_epochs,
                                                             strategy,
                                                             options,
                                                             g)

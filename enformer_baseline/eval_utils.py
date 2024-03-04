@@ -272,7 +272,6 @@ def return_distributed_iterators(gcs_path_tss,
                                  out_length,
                                  num_targets,
                                  num_parallel_calls,
-                                 num_epoch,
                                  strategy,
                                  options,
                                  g):
