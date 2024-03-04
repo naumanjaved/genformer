@@ -40,8 +40,8 @@ def main():
         filter_list_seq = input_ckpt.split('_')[-10:-4]
         filter_list_seq[0] = filter_list_seq[0].split('-')[1]
         filter_list_seq = ','.join(filter_list_seq)
-        lr_base1 = '-'.join(input_ckpt.split('_')[-11].split('-')[1:])
-        lr_base2 = '-'.join(input_ckpt.split('_')[-10].split('-')[1:])
+        lr_base1 = '-'.join(input_ckpt.split('_')[-12].split('-')[1:])
+        lr_base2 = '-'.join(input_ckpt.split('_')[-11].split('-')[1:])
     else:
         seed = args.seed
         run_id = args.run_id
