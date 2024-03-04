@@ -181,14 +181,6 @@ def main():
                                                             wandb.config.val_steps_ho, wandb.config.use_motif_activity,
                                                             g, g_val,g_val_ho)
         
-        #train_human_its_mult = train_human_its
-
-
-        inits=None
-        if wandb.config.load_init_FT:
-            print('loading fine-tuning weights')
-            inits=load_weights_atac_rna.get_initializers_genformer_ft(wandb.config.checkpoint_path_FT)
-
         print('created dataset iterators')
         # initialize model
         model = genformer.genformer(kernel_transformation=wandb.config.kernel_transformation,
@@ -203,8 +195,6 @@ def main():
                                 norm=True,
                                 BN_momentum=wandb.config.BN_momentum,
                                 normalize = True,
-                                load_init = wandb.config.load_init_FT,
-                                inits=inits,
                                 seed = wandb.config.val_data_seed,
                                 num_transformer_layers=wandb.config.num_transformer_layers,
                                 final_point_scale=wandb.config.final_point_scale,
@@ -295,6 +285,7 @@ def main():
         if wandb.config.load_init_FT:
             ckpt_FT=tf.train.Checkpoint(model=model)
             status = ckpt_FT.restore(wandb.config.checkpoint_path_FT)
+            status.
             print('restored from checkpoint for fine-tuning')
 
         local_epoch = 0
@@ -357,6 +348,8 @@ def main():
                         step=step_num)
             if wandb.config.predict_atac:
                 print('train_loss_atac: ' + str(NUM_REPLICAS*metric_dict['train_loss_atac'].result().numpy()))
+                print('ATAC_PearsonR_tr: ' + str(metric_dict['ATAC_PearsonR_tr'].result()['PearsonR'].numpy()))
+                print('ATAC_R2_tr: ' + str(metric_dict['ATAC_R2_tr'].result()['R2'].numpy()))
                 wandb.log({'train_loss_atac': NUM_REPLICAS*metric_dict['train_loss_atac'].result().numpy(),
                         'ATAC_PearsonR_tr': metric_dict['ATAC_PearsonR_tr'].result()['PearsonR'].numpy(),
                         'ATAC_R2_tr': metric_dict['ATAC_R2_tr'].result()['R2'].numpy()},
