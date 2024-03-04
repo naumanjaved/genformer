@@ -104,14 +104,12 @@ def main():
             
             wandb.config.test_examples=args.test_examples
             
-            run_name = '_'.join(['ENFORMER_test',
-                                 args.model_save_basename])
+            run_name = 'ENFORMER_test'
             date_string = f'{datetime.now():%Y-%m-%d %H:%M:%S%z}'
             date_string = date_string.replace(' ','_')
             
             wandb.run.name = run_name + "_" + date_string
-            base_name = wandb.config.model_save_basename + "_" + wandb.run.name
-            
+
             '''
             TPU init options
             '''
