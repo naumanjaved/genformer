@@ -100,8 +100,7 @@ def return_test_build_functions(model,
                        dtype = tf.float32)
         
         
-        target_mean = (target + tf.reverse(target, axis=[1]))/2.0
-        
+        target_mean = (target + tf.reverse(target_rev, axis=[1]))/2.0
         
         sequence=tf.cast(inputs['sequence'],
                          dtype=tf.float32)
@@ -117,8 +116,6 @@ def return_test_build_functions(model,
                          dtype=tf.float32)
         output_mean = (output + tf.reverse(output_rev,axis=[1]))/2.0
 
-        print(output_mean)
-        
         pred = tf.reduce_sum(output * tss_mask,axis=1)
         true = tf.reduce_sum(target * tss_mask,axis=1)
         
