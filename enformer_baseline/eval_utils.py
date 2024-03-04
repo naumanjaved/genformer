@@ -90,18 +90,12 @@ def return_test_build_functions(model,
                                                   dtype=tf.float32)
     metric_dict['pearsonsR'] = metrics.MetricDict({'PearsonR': metrics.PearsonR(reduce_axis=(0,1))})
     metric_dict['R2'] = metrics.MetricDict({'R2': metrics.R2(reduce_axis=(0,1))})
-    loss_fn = tf.keras.losses.Poisson(reduction=tf.keras.losses.Reduction.NONE)
 
     @tf.function(jit_compile=True)
     def test_step(inputs):
         target=tf.cast(inputs['target'],
                        dtype = tf.float32)
-        target_rev=tf.cast(inputs['target_rev'],
-                       dtype = tf.float32)
-        
-        
-        target_mean = (target + tf.reverse(target_rev, axis=[1]))/2.0
-        
+
         sequence=tf.cast(inputs['sequence'],
                          dtype=tf.float32)
         rev_comp_sequence=tf.cast(inputs['rev_comp_sequence'],
@@ -114,25 +108,22 @@ def return_test_build_functions(model,
         
         output_rev = tf.cast(model(rev_comp_sequence, is_training=False)['human'],
                          dtype=tf.float32)
-        output_mean = (output + tf.reverse(output_rev,axis=[1]))/2.0
 
         pred = tf.reduce_sum(output * tss_mask,axis=1)
         true = tf.reduce_sum(target * tss_mask,axis=1)
         
         pred_rev = tf.reduce_sum(output_rev * tss_mask_rev,axis=1)
-        true_rev = tf.reduce_sum(target_rev * tss_mask_rev,axis=1)
         
         gene_name = tf.cast(inputs['gene_name'],dtype=tf.int32)
         cell_types = tf.cast(inputs['cell_types'],dtype=tf.int32)
         
         
-        metric_dict['pearsonsR'].update_state(target_mean, output_mean)
-        metric_dict['R2'].update_state(target_mean, output_mean)
+        metric_dict['pearsonsR'].update_state(target, output)
+        metric_dict['R2'].update_state(target, output)
         
         pred_mean = (pred + pred_rev)/2.0
-        true_mean = (true + true_rev)/2.0
 
-        return pred_mean, true_mean, gene_name, cell_types
+        return pred_mean, true, gene_name, cell_types
 
         
     def build_step(iterator): #input_batch, model, optimizer, organism, gradient_clip):
@@ -177,8 +168,7 @@ def deserialize_val_TSS(serialized_example,input_length=196608,max_shift=4, out_
                       [320,0],
                       [896,-1])
     target = tf.math.pow(target,0.50)
-    target_rev = tf.reverse(target,axis=[0])
-    
+
     tss_mask = tf.io.parse_tensor(example['tss_mask'],
                                   out_type=tf.int32)
     tss_mask = tf.slice(tss_mask,
@@ -195,8 +185,6 @@ def deserialize_val_TSS(serialized_example,input_length=196608,max_shift=4, out_
             'rev_comp_sequence': tf.ensure_shape(rev_comp_sequence,
                                         [input_length,4]),
             'target': tf.ensure_shape(target,
-                                      [896,50]),
-            'target_rev': tf.ensure_shape(target_rev,
                                       [896,50]),
             'tss_mask': tf.ensure_shape(tss_mask,
                                         [896,1]),
