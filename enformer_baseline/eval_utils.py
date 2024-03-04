@@ -116,6 +116,8 @@ def return_test_build_functions(model,
         output_rev = tf.cast(model(rev_comp_sequence, is_training=False)['human'],
                          dtype=tf.float32)
         output_mean = (output + tf.reverse(output_rev,axis=[1]))/2.0
+
+        print(output_mean)
         
         pred = tf.reduce_sum(output * tss_mask,axis=1)
         true = tf.reduce_sum(target * tss_mask,axis=1)

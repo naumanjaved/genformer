@@ -73,7 +73,7 @@ def main():
             },
             'parameters': {
                 'checkpoint_path': {
-                    'values':[parse_bool_str(x) for x in args.checkpoint_path.split(',')]
+                    'values':[args.checkpoint_path]
                 }
                 }
 
@@ -163,10 +163,7 @@ def main():
             checkpoint.restore(latest,options=options)
 
 
-            pearsonsR=metric_dict['pearsonsR'].result()['PearsonR'].numpy()
-            print('human test pearsonsR: ' + str(np.nanmean(pearsonsR)))
-            R2=metric_dict['R2'].result()['R2'].numpy()
-            print('human test r2: ' + str(np.nanmean(R2)))
+
                 
             print('computing TSS quant metrics')
             pred_list = [] # list to store predictions
@@ -193,6 +190,14 @@ def main():
                 gene_spec_mean_corrs, \
                     cell_spec_mean_corrs_raw, \
                         gene_spec_mean_corrs_raw = corrs_overall
+            
+            pearsonsR=metric_dict['pearsonsR'].result()['PearsonR'].numpy()
+            print('human test pearsonsR: ' + str(np.nanmean(pearsonsR)))
+            R2=metric_dict['R2'].result()['R2'].numpy()
+            print('human test r2: ' + str(np.nanmean(R2)))
+
+            print('cell_spec_mean_corrs: ' + str(cell_spec_mean_corrs))
+            print('gene_spec_mean_corrs: ' + str(gene_spec_mean_corrs))
                 
             results_df.to_csv('test_set/test_set_results.tsv',sep='\t',header=True,index=False)
 
