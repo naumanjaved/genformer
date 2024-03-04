@@ -128,7 +128,7 @@ def main():
                                 allow_val_change=True)
             
 
-            test_data_it,test_data_it_build =  \
+            test_data_it =  \
                 eval_utils.return_distributed_iterators(args.gcs_path_TSS,
                                                             GLOBAL_BATCH_SIZE,
                                                             196608,
@@ -139,7 +139,7 @@ def main():
                                                             strategy,
                                                             options)
 
-                
+            print('made iterators')
             enformer_model = enformer.Enformer(output_heads_dict = {'human': 50})
 
             date_string = f'{datetime.now():%Y-%m-%d %H:%M:%S%z}'
@@ -153,7 +153,7 @@ def main():
             
  
             print('building model...')
-            build_step(test_data_it_build)
+            build_step(test_data_it)
                     
             print('loading weights...')
             options = tf.train.CheckpointOptions(experimental_io_device="/job:localhost")

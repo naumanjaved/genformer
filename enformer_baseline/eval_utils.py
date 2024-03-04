@@ -161,8 +161,6 @@ def deserialize_val_TSS(serialized_example,input_length=196608,max_shift=4, out_
     }
 
     shift = 2
-    input_seq_length = input_length + max_shift
-    interval_end = input_length + shift
 
     example = tf.io.parse_example(serialized_example, feature_map)
     sequence = tf.io.decode_raw(example['sequence'], tf.bool)
@@ -244,22 +242,7 @@ def return_dataset(gcs_path,
                           deterministic=False,
                           num_parallel_calls=num_parallel)
     
-    
-    dataset_build = tf.data.TFRecordDataset(files,
-                                      compression_type='ZLIB',
-                                      num_parallel_reads=num_parallel)
-    dataset_build = dataset_build.with_options(options)
-
-    dataset_build = dataset_build.map(lambda record: deserialize_val_TSS(record,
-                                                     input_length,
-                                                     max_shift,
-                                                     out_length,
-                                                     num_targets),
-                          deterministic=False,
-                          num_parallel_calls=num_parallel)
-
-    return dataset.batch(batch).prefetch(tf.data.AUTOTUNE).repeat(2), \
-            dataset_build.batch(batch).prefetch(tf.data.AUTOTUNE).repeat(2)
+    return dataset.batch(batch).prefetch(tf.data.AUTOTUNE).repeat(2)
 
 
 
