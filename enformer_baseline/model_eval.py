@@ -137,8 +137,7 @@ def main():
                                                             args.num_targets,
                                                             args.num_parallel,
                                                             strategy,
-                                                            options,
-                                                            g)
+                                                            options)
 
                 
             enformer_model = enformer.Enformer(output_heads_dict = {'human': 50})

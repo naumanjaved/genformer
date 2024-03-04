@@ -219,9 +219,7 @@ def return_dataset(gcs_path,
                    out_length,
                    num_targets,
                    options,
-                   num_parallel,
-                   num_epoch,
-                   g):
+                   num_parallel):
 
     """
     return a tf dataset object for given gcs path
@@ -273,8 +271,7 @@ def return_distributed_iterators(gcs_path_tss,
                                  num_targets,
                                  num_parallel_calls,
                                  strategy,
-                                 options,
-                                 g):
+                                 options):
     """ 
     returns train + val dictionaries of distributed iterators
     for given heads_dictionary
@@ -289,9 +286,7 @@ def return_distributed_iterators(gcs_path_tss,
                                  out_length,
                                  num_targets,
                                  options,
-                                 num_parallel_calls,
-                                 num_epoch,
-                                     g)
+                                 num_parallel_calls)
             
         val_dist_TSS= strategy.experimental_distribute_dataset(val_data_TSS)
 
