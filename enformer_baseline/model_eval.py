@@ -102,7 +102,7 @@ def main():
             wandb.config.gcs_path_TSS=args.gcs_path_TSS
             wandb.config.input_length=args.input_length
             
-            wandb.config.num_examples=args.num_examples
+            wandb.config.test_examples=args.test_examples
             
             run_name = '_'.join(['ENFORMER_test',
                                  args.model_save_basename])
