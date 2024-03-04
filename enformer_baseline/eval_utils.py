@@ -308,7 +308,7 @@ def make_plots(y_trues,
     except np.linalg.LinAlgError as err:
         cell_specific_corrs = [0.0] * len(np.unique(cell_types))
 
-    try: 
+    try:
         gene_specific_corrs=results_df.groupby('gene_encoding')[['true_zscore','pred_zscore']].corr(method='pearson').unstack().iloc[:,1].tolist()
         gene_specific_corrs_raw=results_df.groupby('gene_encoding')[['true','pred']].corr(method='pearson').unstack().iloc[:,1].tolist()
 
@@ -318,7 +318,7 @@ def make_plots(y_trues,
     corrs_overall = np.nanmean(cell_specific_corrs), np.nanmean(gene_specific_corrs), \
                         np.nanmean(cell_specific_corrs_raw), np.nanmean(gene_specific_corrs_raw)
                         
-    return corrs_overall, results_df
+    return corrs_overall
 
 def parse_args(parser):
     """Loads in command line arguments

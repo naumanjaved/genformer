@@ -179,11 +179,11 @@ def main():
                 for x in strategy.experimental_local_results(cell): # flatten the pred values
                     cell_list.append(tf.reshape(x, [-1]))
 
-            corrs_overall= eval_utils.make_plots(tf.concat(true_list,0),
+            corrs_overall = eval_utils.make_plots(tf.concat(true_list,0),
                                                              tf.concat(pred_list,0),
                                                              tf.concat(cell_list,0),
                                                              tf.concat(gene_list,0))
-
+            
             cell_spec_mean_corrs, \
                 gene_spec_mean_corrs, \
                     cell_spec_mean_corrs_raw, \
