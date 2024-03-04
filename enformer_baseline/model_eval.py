@@ -179,7 +179,7 @@ def main():
                 for x in strategy.experimental_local_results(cell): # flatten the pred values
                     cell_list.append(tf.reshape(x, [-1]))
 
-            corrs_overall,results_df= eval_utils.make_plots(tf.concat(true_list,0),
+            corrs_overall= eval_utils.make_plots(tf.concat(true_list,0),
                                                              tf.concat(pred_list,0),
                                                              tf.concat(cell_list,0),
                                                              tf.concat(gene_list,0))
@@ -188,6 +188,13 @@ def main():
                 gene_spec_mean_corrs, \
                     cell_spec_mean_corrs_raw, \
                         gene_spec_mean_corrs_raw = corrs_overall
+            
+
+            results_df = pd.DataFrame()
+            results_df['true'] = tf.concat(true_list,0)
+            results_df['pred'] = tf.concat(pred_list,0)
+            results_df['cell_type_encoding'] = tf.concat(cell_list,0)
+            results_df['gene_encoding'] = tf.concat(gene_list,0)
             
             pearsonsR=metric_dict['pearsonsR'].result()['PearsonR'].numpy()
             print('human test pearsonsR: ' + str(np.nanmean(pearsonsR)))
