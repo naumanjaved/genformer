@@ -187,7 +187,7 @@ def deserialize_val_TSS(serialized_example,input_length=196608,max_shift=4, out_
     tss_mask = tf.slice(tss_mask,
                       [320,0],
                       [896,-1])
-    tss_mask_rev = tf.reverse(tss_mask_rev,axis=[0])
+    tss_mask_rev = tf.reverse(tss_mask,axis=[0])
     gene_name= tf.io.parse_tensor(example['gene_name'],out_type=tf.int32)
     gene_name = tf.tile(tf.expand_dims(gene_name,axis=0),[50])
     
