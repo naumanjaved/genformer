@@ -37,6 +37,8 @@ from scipy.stats.stats import pearsonr
 from scipy.stats.stats import spearmanr  
 from scipy import stats
 
+import eval_utils as eval_utils
+
 import optimizers
 
 def parse_bool_str(input_str):
@@ -83,7 +85,7 @@ def main():
         # Specify the other hyperparameters to the configuration, if any
 
         ## tpu initialization
-        strategy = training_utils.tf_tpu_initialize(args.tpu_name)
+        strategy = eval_utils.tf_tpu_initialize(args.tpu_name)
         g = tf.random.Generator.from_seed(datetime.now().timestamp())
         ## rest must be w/in strategy scope
         with strategy.scope():
@@ -127,9 +129,9 @@ def main():
             wandb.config.update({"test_steps" : num_test // GLOBAL_BATCH_SIZE + 3},
                                 allow_val_change=True)
             
-            
+
             test_data_it,test_data_it_build =  \
-                training_utils.return_distributed_iterators(args.gcs_path_TSS,
+                eval_utils.return_distributed_iterators(args.gcs_path_TSS,
                                                             GLOBAL_BATCH_SIZE,
                                                             196608,
                                                             4,
@@ -147,19 +149,11 @@ def main():
             date_string = f'{datetime.now():%Y-%m-%d %H:%M:%S%z}'
             date_string = date_string.replace(' ','_')
             
-            checkpoint_name = wandb.config.model_save_dir + "/" + \
-                            wandb.config.model_save_basename + "_" + date_string + "_" + wandb.run.name
-
-
-            model_checkpoint = tf.train.Checkpoint(module=enformer_model)
-                
-        
             metric_dict = {}
 
-            test_step,build_step,metric_dict = training_utils.return_train_val_functions(enformer_model,
+            test_step,build_step,metric_dict = eval_utils.return_test_build_functions(enformer_model,
                                                                                         strategy,
-                                                                                        metric_dict,
-                                                                                        NUM_REPLICAS)
+                                                                                        metric_dict)
             
  
             print('building model...')
@@ -172,16 +166,10 @@ def main():
             latest = tf.train.checkpoint(wandb.config.checkpoint_path)
             checkpoint.restore(latest,options=options)
 
-            for step in range(wandb.config.test_steps):
-                strategy.run(test_step, args=(next(test_data_it),))
 
             pearsonsR=metric_dict['pearsonsR'].result()['PearsonR'].numpy()
-            wandb.log({'human_test_tracks_pearsons': np.nanmean(pearsonsR)},
-                      step=epoch_i)
             print('human test pearsonsR: ' + str(np.nanmean(pearsonsR)))
             R2=metric_dict['R2'].result()['R2'].numpy()
-            wandb.log({'human_test_tracks_R2': np.nanmean(R2)},
-                      step=epoch_i)
             print('human test r2: ' + str(np.nanmean(R2)))
                 
             print('computing TSS quant metrics')
@@ -190,7 +178,7 @@ def main():
             gene_list = []
             cell_list = []
             for step in range(wandb.config.test_steps):
-                pred, true, gene, cell= strategy.run(val_step_TSS,args = (next(val_data_TSS_it),))
+                pred, true, gene, cell= strategy.run(test_step,args = (next(test_data_it),))
                 for x in strategy.experimental_local_results(true): # flatten the true values
                     true_list.append(tf.reshape(x, [-1]))
                 for x in strategy.experimental_local_results(pred): # flatten the pred values
@@ -200,7 +188,7 @@ def main():
                 for x in strategy.experimental_local_results(cell): # flatten the pred values
                     cell_list.append(tf.reshape(x, [-1]))
 
-            figures,results_df= training_utils.make_plots(tf.concat(true_list,0),
+            corrs_overall,results_df= eval_utils.make_plots(tf.concat(true_list,0),
                                                              tf.concat(pred_list,0),
                                                              tf.concat(cell_list,0),
                                                              tf.concat(gene_list,0))
@@ -209,13 +197,6 @@ def main():
                 gene_spec_mean_corrs, \
                     cell_spec_mean_corrs_raw, \
                         gene_spec_mean_corrs_raw = corrs_overall
-                
-
-                wandb.log({'gene_spec_mean_corrs': gene_spec_mean_corrs,
-                           'gene_spec_mean_corrs_raw': gene_spec_mean_corrs_raw,
-                           'cell_spec_mean_corrs': cell_spec_mean_corrs,
-                           'cell_spec_mean_corrs_raw': cell_spec_mean_corrs_raw},
-                          step=epoch_i)
                 
             results_df.to_csv('test_set/test_set_results.tsv',sep='\t',header=True,index=False)
 

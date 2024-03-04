@@ -1,6 +1,6 @@
 #!/bin/bash -l
 
-python3 train_model.py \
+python3 model_eval.py \
             --tpu_name="node-1" \
             --tpu_zone="us-central1-a" \
             --wandb_project="enformer_rampage_ft" \

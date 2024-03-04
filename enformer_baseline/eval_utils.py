@@ -73,12 +73,9 @@ consolidate into single simpler function
 """
 
 
-def return_train_val_functions(model,
-                               optimizers,
+def return_test_build_functions(model,
                                strategy,
-                               metric_dict,
-                               num_replicas,
-                               gradient_clip):
+                               metric_dict):
     """Returns distributed test function
     Args:
         model: model object
@@ -96,7 +93,7 @@ def return_train_val_functions(model,
     loss_fn = tf.keras.losses.Poisson(reduction=tf.keras.losses.Reduction.NONE)
 
     @tf.function(jit_compile=True)
-    def val_step_TSS(inputs):
+    def test_step(inputs):
         target=tf.cast(inputs['target'],
                        dtype = tf.float32)
         target_rev=tf.cast(inputs['target_rev'],
@@ -116,7 +113,7 @@ def return_train_val_functions(model,
         output = tf.cast(model(sequence, is_training=False)['human'],
                          dtype=tf.float32)
         
-        output_rev = tf.cast(model(sequence_rev, is_training=False)['human'],
+        output_rev = tf.cast(model(rev_comp_sequence, is_training=False)['human'],
                          dtype=tf.float32)
         output_mean = (output + tf.reverse(output_rev,axis=[1]))/2.0
         
@@ -151,7 +148,7 @@ def return_train_val_functions(model,
         for _ in tf.range(1): ## for loop within @tf.fuction for improved TPU performance
             strategy.run(val_step, args=(next(iterator),))
         
-    return val_step_TSS, build_step, metric_dict
+    return test_step, build_step, metric_dict
 
         
 def deserialize_val_TSS(serialized_example,input_length=196608,max_shift=4, out_length=1536,num_targets=50):
@@ -268,8 +265,7 @@ def return_dataset(gcs_path,
 
 
 
-def return_distributed_iterators(gcs_path,
-                                 gcs_path_tss,
+def return_distributed_iterators(gcs_path_tss,
                                  global_batch_size,
                                  input_length,
                                  max_shift,
