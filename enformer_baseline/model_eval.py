@@ -54,7 +54,7 @@ def main():
     # ============== arg parse ==============================================# 
     parser = argparse.ArgumentParser(
         description='process input for genformer training loop')
-    parser = training_utils.parse_args(parser)
+    parser = eval_utils.parse_args(parser)
     args = parser.parse_args()
     
     #================ init ==================================================# 
