@@ -292,6 +292,10 @@ def main():
             print('restart at data batch: ' + str(batch_num.numpy()))
             wandb.config.update({"num_epochs_to_start": batch_num.numpy()}, 
                                 allow_val_change=True)
+        if wandb.config.load_init_FT:
+            ckpt_FT=tf.train.Checkpoint(model=model)
+            status = ckpt_FT.restore(wandb.config.checkpoint_path_FT)
+            print('restored from checkpoint for fine-tuning')
 
         local_epoch = 0
         print(wandb.config)
