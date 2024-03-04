@@ -159,12 +159,10 @@ def main():
             options = tf.train.CheckpointOptions(experimental_io_device="/job:localhost")
             checkpoint = tf.train.Checkpoint(module=enformer_model)
             tf.saved_model.LoadOptions(experimental_io_device='/job:localhost')
-            latest = tf.train.checkpoint(wandb.config.checkpoint_path)
-            checkpoint.restore(latest,options=options)
+            #latest = tf.train.checkpoint(wandb.config.checkpoint_path)
+            status = checkpoint.restore(wandb.config.checkpoint_path,options=options)
+            status.assert_existing_objects_matched()
 
-
-
-                
             print('computing TSS quant metrics')
             pred_list = [] # list to store predictions
             true_list = [] # list to store true values
