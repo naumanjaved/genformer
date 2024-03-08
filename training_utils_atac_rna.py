@@ -89,7 +89,8 @@ def return_train_val_functions(model, optimizers_in,
                                     model.performer.trainable_variables + \
                                     model.pre_transformer_projection.trainable_variables
             if predict_atac:
-                output_heads = model.final_pointwise_conv.trainable_variables + \
+                base_weights = base_weights + \
+                                    model.final_pointwise_conv.trainable_variables + \
                                     model.final_dense_profile.trainable_variables + \
                                     model.final_pointwise_conv_rna.trainable_variables + \
                                     model.final_dense_profile_rna.trainable_variables
