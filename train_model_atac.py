@@ -118,7 +118,8 @@ def main():
             'warmup_steps': float(args.warmup_steps),
             'return_constant_lr': parse_bool_str(args.return_constant_lr),
             'unmask_loss': parse_bool_str(args.unmask_loss),
-            'weight_decay': float(args.weight_decay)
+            'weight_decay': float(args.weight_decay),
+            'mask_noise' : parse_bool_str(args.mask_noise)
     }
 
     wandb.init(config=config,
@@ -167,6 +168,7 @@ def main():
                                                             wandb.config.use_atac, wandb.config.use_seq, wandb.config.seed,
                                                             wandb.config.val_data_seed, wandb.config.atac_corrupt_rate,
                                                             wandb.config.val_steps_ho, wandb.config.use_motif_activity,
+                                                            wandb.config.mask_noise,
                                                             g, g_val)
         
         #train_human_its_mult = train_human_its

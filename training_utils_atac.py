@@ -125,7 +125,7 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
                    input_length = 524288, max_shift = 4, output_length_ATAC = 131072,
                    output_length = 4096, crop_size = 2, output_res = 128,
                    atac_mask_dropout = 0.15, mask_size = 1536, log_atac = False,
-                   use_atac = True, use_seq = True, atac_corrupt_rate = 20):
+                   use_atac = True, use_seq = True, atac_corrupt_rate = 20, mask_noise=False):
     """
     Deserialize a serialized example from a TFRecordFile and apply various transformations
     and augmentations to the data. Among these, the input atac profile will have one atac peak
@@ -218,12 +218,14 @@ def deserialize_tr(serialized_example, g, use_motif_activity,
                                                 randomish_seed,
                                                 atac_mask_int,
                                                 atac_mask_dropout)
+    masked_atac = atac * full_comb_mask #+ atac_scrambled * (1.0-full_comb_mask) ## apply the mask to the input profile
 
     ## scrambled input 
-    #atac_scrambled = tf.reshape(tf.random.experimental.stateless_shuffle(tf.reshape(atac, [-1,512]),
-    #                                                          seed=[randomish_seed+34,randomish_seed+4]),
-    #                                                          [-1,1])
-    masked_atac = atac * full_comb_mask #+ atac_scrambled * (1.0-full_comb_mask) ## apply the mask to the input profile
+    if mask_noise:
+        atac_scrambled = tf.reshape(tf.random.experimental.stateless_shuffle(tf.reshape(atac, [-1,512]),
+                                                                  seed=[randomish_seed+34,randomish_seed+4]),
+                                                                  [-1,1])
+        masked_atac = masked_atac + atac_scrambled * (1.0-full_comb_mask) ## apply the mask to the input profile
 
     if log_atac:
         masked_atac = tf.math.log1p(masked_atac)
@@ -277,7 +279,7 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
                    input_length = 524288, max_shift = 10, output_length_ATAC = 131072,
                    output_length = 4096, crop_size = 2, output_res = 128,
                    atac_mask_dropout = 0.15, mask_size = 1536, log_atac = False,
-                   use_atac = True, use_seq = True):
+                   use_atac = True, use_seq = True,mask_noise=False):
     """
     Deserialize a serialized example from a TFRecordFile to return validation data. 
     For validation, we will mask one peak of the input atac profile  and apply atac_mask_dropout 
@@ -374,11 +376,12 @@ def deserialize_val(serialized_example, g_val, use_motif_activity,
                                                 randomish_seed,
                                                 1, # set atac_mask_int to 1 to prevent increased masking used in training
                                                 atac_mask_dropout)
-
-    #atac_scrambled = tf.reshape(tf.random.experimental.stateless_shuffle(tf.reshape(atac, [-1,512]),
-    #                                                          seed=[randomish_seed+34,randomish_seed+4]),
-    #                                                          [-1,1])
-    masked_atac = atac * full_comb_mask #+ atac_scrambled * (1.0-full_comb_mask) ## apply the mask to the input profile
+    masked_atac = atac * full_comb_mask
+    if mask_noise:
+        atac_scrambled = tf.reshape(tf.random.experimental.stateless_shuffle(tf.reshape(atac, [-1,512]),
+                                                                  seed=[randomish_seed+34,randomish_seed+4]),
+                                                                  [-1,1])
+        masked_atac = atac * full_comb_mask + atac_scrambled * (1.0-full_comb_mask)
 
     if log_atac:
         masked_atac = tf.math.log1p(masked_atac)
@@ -431,7 +434,7 @@ def return_dataset(gcs_path, split, batch, input_length, output_length_ATAC,
                    num_parallel, num_epoch, atac_mask_dropout,
                    random_mask_size, log_atac, use_atac, use_seq, seed,
                    atac_corrupt_rate, validation_steps,
-                   use_motif_activity, g):
+                   use_motif_activity, mask_noise, g):
     """
     return a tf dataset object for given gcs path
     """
@@ -458,7 +461,7 @@ def return_dataset(gcs_path, split, batch, input_length, output_length_ATAC,
                 crop_size, output_res,
                 atac_mask_dropout, random_mask_size,
                 log_atac, use_atac, use_seq,
-                atac_corrupt_rate),
+                atac_corrupt_rate,mask_noise),
             deterministic=False,
             num_parallel_calls=tf.data.AUTOTUNE)
 
@@ -476,7 +479,7 @@ def return_dataset(gcs_path, split, batch, input_length, output_length_ATAC,
                 output_length_ATAC, output_length,
                 crop_size, output_res,
                 atac_mask_dropout, random_mask_size,
-                log_atac, use_atac, use_seq),
+                log_atac, use_atac, use_seq,mask_noise),
             deterministic=False,
             num_parallel_calls=tf.data.AUTOTUNE)
 
@@ -491,21 +494,21 @@ def return_distributed_iterators(gcs_path, gcs_path_ho, global_batch_size,
                                  random_mask_size,
                                  log_atac, use_atac, use_seq, seed,seed_val,
                                  atac_corrupt_rate, 
-                                 validation_steps, use_motif_activity, g, g_val):
+                                 validation_steps, use_motif_activity, mask_noise, g, g_val):
 
     tr_iterator = return_dataset(gcs_path, "train", global_batch_size, input_length,
                              output_length_ATAC, output_length, crop_size,
                              output_res, max_shift, options, num_parallel_calls,
                              num_epoch, atac_mask_dropout, random_mask_size,
                              log_atac, use_atac, use_seq, seed,
-                             atac_corrupt_rate, validation_steps, use_motif_activity, g)
+                             atac_corrupt_rate, validation_steps, use_motif_activity, mask_noise, g)
 
     val_data_ho = return_dataset(gcs_path_ho, "valid", global_batch_size, input_length,
                                  output_length_ATAC, output_length, crop_size,
                                  output_res, max_shift, options_val, num_parallel_calls, num_epoch,
                                  atac_mask_dropout_val, random_mask_size, log_atac,
                                  use_atac, use_seq, seed_val, atac_corrupt_rate,
-                                 validation_steps, use_motif_activity, g_val)
+                                 validation_steps, use_motif_activity, mask_noise, g_val)
 
     val_dist_ho=strategy.experimental_distribute_dataset(val_data_ho)
     val_data_ho_it = iter(val_dist_ho)
@@ -633,6 +636,7 @@ def parse_args(parser):
     parser.add_argument('--unmask_loss',type=str, default="False", help= 'unmask_loss')
     parser.add_argument('--step_to_start',type=int,default=0,help='step_to_start')
     parser.add_argument('--weight_decay',type=float,default=1.0e-05,help='weight_decay')
+    parser.add_argument('--mask_noise',type=str,default="False",help='mask_noise')
     args = parser.parse_args()
     return parser
 
