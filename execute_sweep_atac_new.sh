@@ -24,12 +24,12 @@ python3 train_model_atac.py \
             --patience=50 \
             --output_res=128 \
             --min_delta=0.0000005 \
-            --model_save_dir="gs://$3/atac_pretrain/models" \
+            --model_save_dir="gs://$3/atac_pretrain/524k/models" \
             --epsilon=1.0e-8 \
-            --num_transformer_layers="10" \
+            --num_transformer_layers="8" \
             --dropout_rate="0.20" \
             --pointwise_dropout_rate="0.10" \
-            --num_heads="8" \
+            --num_heads="4" \
             --kernel_transformation="relu_kernel_transformation" \
             --savefreq=1 \
             --rectify="True" \
@@ -49,8 +49,8 @@ python3 train_model_atac.py \
             --lr_base="1.0e-04" \
             --decay_frac="0.10" \
             --gradient_clip="1.0" \
-            --seed=1 \
-            --val_data_seed=19 \
+            --seed=94 \
+            --val_data_seed=21 \
             --loss_type="poisson" \
             --model_save_basename="genformer" \
             --warmup_steps=5000 \
