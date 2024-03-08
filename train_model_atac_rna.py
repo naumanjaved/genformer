@@ -209,14 +209,14 @@ def main():
         init_learning_rate=1.0e-07
         optimizer1 = tf.keras.optimizers.AdamW(learning_rate=init_learning_rate,
                                                 epsilon=wandb.config.epsilon,
-                                                weight_decay=1.0e-05,
+                                                weight_decay=1.0e-06,
                                                 global_clipnorm=wandb.config.gradient_clip)
         optimizer1.exclude_from_weight_decay(var_names = ['bias', 'batch_norm','layer_norm',
                                                         'BN', 'LN', 'LayerNorm','BatchNorm'])
         
         optimizer2 = tf.keras.optimizers.AdamW(learning_rate=init_learning_rate,
                                                 epsilon=wandb.config.epsilon,
-                                                weight_decay=1.0e-05,
+                                                weight_decay=1.0e-06,
                                                 global_clipnorm=wandb.config.gradient_clip)
         optimizer2.exclude_from_weight_decay(var_names = ['bias', 'batch_norm','layer_norm',
                                                         'BN', 'LN', 'LayerNorm','BatchNorm'])
