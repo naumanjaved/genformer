@@ -91,12 +91,10 @@ def return_train_val_functions(model, optimizers_in,
             if predict_atac:
                 base_weights = base_weights + \
                                     model.final_pointwise_conv.trainable_variables + \
-                                    model.final_dense_profile.trainable_variables + \
-                                    model.final_pointwise_conv_rna.trainable_variables + \
-                                    model.final_dense_profile_rna.trainable_variables
-            else:
-                output_heads = model.final_pointwise_conv_rna.trainable_variables + \
-                    model.final_dense_profile_rna.trainable_variables
+                                    model.final_dense_profile.trainable_variables
+
+            output_heads = model.final_pointwise_conv_rna.trainable_variables + \
+                model.final_dense_profile_rna.trainable_variables
 
             all_vars = base_weights + output_heads
 
