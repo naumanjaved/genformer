@@ -226,7 +226,7 @@ def main():
 
         manager = tf.train.CheckpointManager(ckpt,
                                                 directory=checkpoint_dir,
-                                                max_to_keep=20)
+                                                max_to_keep=30)
 
         # initialize functions for training and validation steps
         train_step, val_step, build_step, metric_dict = \
