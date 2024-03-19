@@ -25,9 +25,9 @@ python3 train_model_atac_rna.py \
             --patience=50 \
             --output_res=128 \
             --min_delta=0.0000005 \
-            --model_save_dir="gs://$3/rampage_finetune/models" \
+            --model_save_dir="gs://$3/524k/rampage_finetune/models" \
             --epsilon=1.0e-8 \
-            --num_transformer_layers="10" \
+            --num_transformer_layers="8" \
             --dropout_rate="0.20" \
             --pointwise_dropout_rate="0.10" \
             --num_heads="8" \
@@ -50,7 +50,7 @@ python3 train_model_atac_rna.py \
             --lr_base1="1.0e-04" \
             --lr_base2="1.0e-04" \
             --decay_frac="0.10" \
-            --gradient_clip="1.0" \
+            --gradient_clip="0.1" \
             --seed=9 \
             --val_data_seed=19 \
             --loss_type="poisson" \
